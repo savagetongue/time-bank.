@@ -51,10 +51,7 @@ const router = createBrowserRouter([
       },
       {
         path: "/admin",
-        children: [
-          { index: true, element: <Navigate to="disputes" replace /> },
-          { path: "disputes", element: <AdminPage /> },
-        ]
+        element: <AdminPage />,
       },
     ]
   },

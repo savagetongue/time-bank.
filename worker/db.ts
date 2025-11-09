@@ -1,4 +1,4 @@
-import { createPool, Pool } from 'mysql2/promise';
+import { createPool, Pool, PoolConnection } from 'mysql2/promise';
 import { Context } from 'hono';
 let pool: Pool;
 export function getClient(c: Context): Pool {
@@ -18,5 +18,5 @@ export function getClient(c: Context): Pool {
       queueLimit: 0,
     });
   }
-  return pool as Pool;
+  return pool;
 }

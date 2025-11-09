@@ -100,6 +100,13 @@ export type LedgerEntry = {
 export type Balance = {
     balance: number;
 };
+export type TopProviderReport = {
+    id: number;
+    name: string;
+    email: string;
+    completed_bookings: number;
+    average_rating: number | null;
+};
 export type ApiSuccessResponse<T> = {
   success: true;
   data: T;

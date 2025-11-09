@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { Env, AuthEnv } from './core-utils';
-import { query, transaction } from './db';
+import { getClient } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
+import { Pool, PoolConnection } from "mysql2/promise";
 export function adminRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     // In a real app, we would have a stronger admin role check middleware.
@@ -23,31 +24,34 @@ export function adminRoutes(app: Hono<{ Bindings: Env }>) {
         if (amount === 0) {
             return c.json({ success: false, error: 'Adjustment amount cannot be zero.' }, 400);
         }
+        let connection: PoolConnection | null = null;
         try {
-            const { newBalance } = await transaction(c, async (tx) => {
-                // Get the latest balance for the member
-                const balanceResult = await tx.execute(
-                    'SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
-                    [memberId]
-                );
-                const currentBalance = balanceResult.rows.length > 0 ? parseFloat((balanceResult.rows[0] as any).balance_after) : 0;
-                const newBalance = currentBalance + amount;
-                // Insert the adjustment entry
-                await tx.execute(
-                    'INSERT INTO ledger (member_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?)',
-                    [memberId, amount, 'ADJUSTMENT', newBalance, `Admin adjustment by #${adminId}: ${reason}`]
-                );
-                return { newBalance };
-            });
+            const pool = getClient(c);
+            connection = await pool.getConnection();
+            await connection.beginTransaction();
+            // Get the latest balance for the member
+            const [balanceResult]: any[] = await connection.query('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [memberId]);
+            const currentBalance = balanceResult.length > 0 ? parseFloat(balanceResult[0].balance_after) : 0;
+            const newBalance = currentBalance + amount;
+            // Insert the adjustment entry
+            await connection.query(
+                'INSERT INTO ledger (member_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
+                [memberId, amount, 'ADJUSTMENT', newBalance, `Admin adjustment by #${adminId}: ${reason}`]
+            );
+            await connection.commit();
             return c.json({ success: true, data: { newBalance } });
         } catch (error) {
+            if (connection) await connection.rollback();
             console.error('Ledger adjustment error:', error);
             return c.json({ success: false, error: 'Internal Server Error' }, 500);
+        } finally {
+            if (connection) connection.release();
         }
     });
     authedApp.get('/api/reports/top-providers', authMiddleware, async (c) => {
         try {
-            const { rows } = await query(c, `
+            const db = getClient(c);
+            const [rows] = await db.query(`
                 SELECT
                     p.id,
                     p.name,

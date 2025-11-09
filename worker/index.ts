@@ -8,6 +8,7 @@ import { bookingRoutes } from './bookingRoutes';
 import { ratingsRoutes } from './ratingsRoutes';
 import { disputeRoutes } from './disputeRoutes';
 import { ledgerRoutes } from './ledgerRoutes';
+import { adminRoutes } from './adminRoutes';
 import { Env } from './core-utils';
 export interface ClientErrorReport {
   message: string;
@@ -31,6 +32,7 @@ bookingRoutes(app);
 ratingsRoutes(app);
 disputeRoutes(app);
 ledgerRoutes(app);
+adminRoutes(app);
 app.get('/api/health', (c) => c.json({ success: true, data: { status: 'healthy', timestamp: new Date().toISOString() }}));
 app.post('/api/client-errors', async (c) => {
   try {
