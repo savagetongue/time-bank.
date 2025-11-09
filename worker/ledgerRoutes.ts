@@ -2,12 +2,13 @@ import { Hono } from "hono";
 import { Env, AuthEnv } from './core-utils';
 import { query } from './db';
 import { authMiddleware } from "./middleware";
+import { RowDataPacket } from "mysql2/promise";
 export function ledgerRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     authedApp.get('/api/ledger', authMiddleware, async (c) => {
         const userId = c.get('userId');
         try {
-            const ledgerEntries = await query(c,
+            const [ledgerEntries] = await query(c,
                 'SELECT id, booking_id, amount, txn_type, balance_after, notes, created_at FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC',
                 [userId]
             );
@@ -20,7 +21,7 @@ export function ledgerRoutes(app: Hono<{ Bindings: Env }>) {
     authedApp.get('/api/balance', authMiddleware, async (c) => {
         const userId = c.get('userId');
         try {
-            const rows: any[] = await query(c,
+            const [rows] = await query<RowDataPacket[]>(c,
                 'SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
                 [userId]
             );

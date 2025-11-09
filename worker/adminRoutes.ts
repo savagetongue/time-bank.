@@ -3,7 +3,7 @@ import { Env, AuthEnv } from './core-utils';
 import { query, transaction } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-
+import { RowDataPacket, OkPacket } from "mysql2/promise";
 export function adminRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     // In a real app, we would have a stronger admin role check middleware.
@@ -27,7 +27,7 @@ export function adminRoutes(app: Hono<{ Bindings: Env }>) {
         try {
             const { newBalance } = await transaction(c, async (conn) => {
                 // Get the latest balance for the member
-                const balanceResult = await conn.execute<any[]>(
+                const [balanceResult] = await conn.execute<RowDataPacket[]>(
                     'SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
                     [memberId]
                 );
@@ -48,7 +48,7 @@ export function adminRoutes(app: Hono<{ Bindings: Env }>) {
     });
     authedApp.get('/api/reports/top-providers', authMiddleware, async (c) => {
         try {
-            const rows = await query(c, `
+            const [rows] = await query(c, `
                 SELECT
                     p.id,
                     p.name,

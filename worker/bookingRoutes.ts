@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { Env, AuthEnv } from './core-utils';
-import { query } from './db';
+import { query, transaction } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-
+import { RowDataPacket, OkPacket } from "mysql2/promise";
 export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     const bookingSchema = z.object({
@@ -19,62 +19,46 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
             return c.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, 400);
         }
         const { requestId, startTime, durationMinutes } = validation.data;
-
         try {
-            const result = await query(c, async (conn) => {
-                await conn.beginTransaction();
-
-                const [requests]: any[] = await conn.execute(
+            const result = await transaction(c, async (conn) => {
+                const [requests] = await conn.execute<RowDataPacket[]>(
                     `SELECT r.id, r.status, o.provider_id, o.rate_per_hour
                      FROM requests r
                      JOIN offers o ON r.offer_id = o.id
                      WHERE r.id = ?`,
                     [requestId]
                 );
-
                 if (requests.length === 0) {
-                    await conn.rollback();
-                    return { error: 'Request not found.', status: 404 };
+                    throw { error: 'Request not found.', status: 404 };
                 }
                 const request = requests[0];
-
                 if (request.provider_id !== providerId) {
-                    await conn.rollback();
-                    return { error: 'You are not authorized to book this request.', status: 403 };
+                    throw { error: 'You are not authorized to book this request.', status: 403 };
                 }
-
                 if (request.status !== 'OPEN') {
-                    await conn.rollback();
-                    return { error: 'This request has already been matched or cancelled.', status: 409 };
+                    throw { error: 'This request has already been matched or cancelled.', status: 409 };
                 }
-
-                const [bookingResult]: any = await conn.execute(
+                const [bookingResult] = await conn.execute<OkPacket>(
                     'INSERT INTO bookings (request_id, start_time, duration_minutes) VALUES (?, ?, ?)',
                     [requestId, startTime, durationMinutes]
                 );
                 const bookingId = bookingResult.insertId;
                 const escrowHeld = parseFloat(request.rate_per_hour) * (durationMinutes / 60);
-
                 await conn.execute(
                     'INSERT INTO escrow (booking_id, amount) VALUES (?, ?)',
                     [bookingId, escrowHeld]
                 );
-
                 await conn.execute(
                     'UPDATE requests SET status = \'MATCHED\' WHERE id = ?',
                     [requestId]
                 );
-
-                await conn.commit();
                 return { data: { bookingId, escrowHeld } };
             });
-
-            if (result.error) {
-                return c.json({ success: false, error: result.error }, result.status);
-            }
-
             return c.json({ success: true, data: result.data }, 201);
-        } catch (error) {
+        } catch (error: any) {
+            if (error.status) {
+                return c.json({ success: false, error: error.error }, error.status);
+            }
             console.error('Create booking error:', error);
             return c.json({ success: false, error: 'Internal Server Error' }, 500);
         }
@@ -114,12 +98,9 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
         if (isNaN(bookingId)) {
             return c.json({ success: false, error: 'Invalid booking ID.' }, 400);
         }
-
         try {
-            const result = await query(c, async (conn) => {
-                await conn.beginTransaction();
-
-                const [bookings]: any[] = await conn.execute(
+            const result = await transaction(c, async (conn) => {
+                const [bookings] = await conn.execute<RowDataPacket[]>(
                     `SELECT
                         b.id, b.status,
                         r.member_id as requester_id,
@@ -132,52 +113,39 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                      WHERE b.id = ?`,
                     [bookingId]
                 );
-
                 if (bookings.length === 0) {
-                    await conn.rollback();
-                    return { error: 'Booking not found.', status: 404 };
+                    throw { error: 'Booking not found.', status: 404 };
                 }
                 const booking = bookings[0];
-
                 if (booking.provider_id !== providerId) {
-                    await conn.rollback();
-                    return { error: 'You are not authorized to complete this booking.', status: 403 };
+                    throw { error: 'You are not authorized to complete this booking.', status: 403 };
                 }
-
                 if (booking.status !== 'PENDING') {
-                    await conn.rollback();
-                    return { error: 'Booking is not in a completable state.', status: 409 };
+                    throw { error: 'Booking is not in a completable state.', status: 409 };
                 }
-
                 await conn.execute('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [bookingId]);
                 await conn.execute('UPDATE escrow SET status = \'RELEASED\' WHERE booking_id = ?', [bookingId]);
-
-                const [requesterBalanceResult]: any[] = await conn.execute('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [booking.requester_id]);
+                const [requesterBalanceResult] = await conn.execute<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [booking.requester_id]);
                 const requesterBalance = requesterBalanceResult.length > 0 ? parseFloat(requesterBalanceResult[0].balance_after) : 0;
                 const newRequesterBalance = requesterBalance - parseFloat(booking.amount);
                 await conn.execute(
                     'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                     [booking.requester_id, bookingId, -booking.amount, 'DEBIT', newRequesterBalance, `Payment for booking #${bookingId}`]
                 );
-
-                const [providerBalanceResult]: any[] = await conn.execute('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [providerId]);
+                const [providerBalanceResult] = await conn.execute<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [providerId]);
                 const providerBalance = providerBalanceResult.length > 0 ? parseFloat(providerBalanceResult[0].balance_after) : 0;
                 const newProviderBalance = providerBalance + parseFloat(booking.amount);
                 await conn.execute(
                     'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                     [providerId, bookingId, booking.amount, 'CREDIT', newProviderBalance, `Credit for booking #${bookingId}`]
                 );
-
-                await conn.commit();
                 return { data: { bookingId, escrowReleased: booking.amount } };
             });
-
-            if (result.error) {
-                return c.json({ success: false, error: result.error }, result.status);
-            }
-
             return c.json({ success: true, data: result.data });
-        } catch (error) {
+        } catch (error: any) {
+            if (error.status) {
+                return c.json({ success: false, error: error.error }, error.status);
+            }
             console.error('Complete booking error:', error);
             return c.json({ success: false, error: 'Internal Server Error' }, 500);
         }

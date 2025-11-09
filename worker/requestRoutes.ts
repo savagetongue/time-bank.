@@ -3,6 +3,7 @@ import { Env, AuthEnv } from './core-utils';
 import { query } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
+import { RowDataPacket, OkPacket } from "mysql2/promise";
 export function requestRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     const requestSchema = z.object({
@@ -18,14 +19,14 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { offerId, note } = validation.data;
         try {
-            const existing = await query(c,
+            const [existing] = await query<RowDataPacket[]>(c,
                 'SELECT id FROM requests WHERE offer_id = ? AND member_id = ? AND status = \'OPEN\'',
                 [offerId, memberId]
             );
             if (existing.length > 0) {
                 return c.json({ success: false, error: 'You already have an open request for this offer.' }, 409);
             }
-            const result = await query(c,
+            const [result] = await query<OkPacket>(c,
                 'INSERT INTO requests (offer_id, member_id, note) VALUES (?, ?, ?)',
                 [offerId, memberId, note]
             );
@@ -59,7 +60,7 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
             } else { // 'outgoing' is the default
                 sqlQuery = `${baseQuery} WHERE r.member_id = ? ORDER BY r.created_at DESC`;
             }
-            const rows = await query(c, sqlQuery, params);
+            const [rows] = await query(c, sqlQuery, params);
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get requests error:', error);

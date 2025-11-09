@@ -4,6 +4,7 @@ import { query } from './db';
 import { z } from 'zod';
 import { User } from '@shared/types';
 import { authMiddleware } from "./middleware";
+import { RowDataPacket, OkPacket } from "mysql2/promise";
 // Helper for password hashing
 async function hashPassword(password: string): Promise<string> {
     const encoder = new TextEncoder();
@@ -39,7 +40,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const { name, email, password } = validation.data;
         const password_hash = await hashPassword(password);
         try {
-            const [result]: any = await query(c,
+            const [result] = await query<OkPacket>(c,
                 'INSERT INTO members (name, email, password_hash) VALUES (?, ?, ?)',
                 [name, email, password_hash]
             );
@@ -68,7 +69,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { email, password } = validation.data;
         try {
-            const [rows]: any[] = await query(c, 'SELECT id, name, email, password_hash, is_provider, created_at FROM members WHERE email = ?', [email]);
+            const [rows] = await query<RowDataPacket[]>(c, 'SELECT id, name, email, password_hash, is_provider, created_at FROM members WHERE email = ?', [email]);
             if (rows.length === 0) {
                 return c.json({ success: false, error: 'Invalid credentials' }, 401);
             }
@@ -95,7 +96,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     authedApp.get('/api/me', authMiddleware, async (c) => {
         const userId = c.get('userId');
         try {
-            const [rows]: any[] = await query(c, 'SELECT id, name, email, is_provider, created_at FROM members WHERE id = ?', [userId]);
+            const [rows] = await query<RowDataPacket[]>(c, 'SELECT id, name, email, is_provider, created_at FROM members WHERE id = ?', [userId]);
             if (rows.length === 0) {
                 return c.json({ success: false, error: 'User not found' }, 404);
             }
@@ -174,7 +175,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { title, description, skills, rate_per_hour } = validation.data;
         try {
-            const [result]: any = await query(c,
+            const [result] = await query<OkPacket>(c,
                 'INSERT INTO offers (provider_id, title, description, skills, rate_per_hour) VALUES (?, ?, ?, ?, ?)',
                 [provider_id, title, description, JSON.stringify(skills), rate_per_hour]
             );
