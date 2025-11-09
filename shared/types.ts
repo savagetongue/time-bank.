@@ -52,6 +52,12 @@ export type Booking = {
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED';
   created_at: string;
 };
+export type BookingWithDetails = Booking & {
+  request: Request;
+  offer: Offer;
+  provider: Member;
+  member: Member;
+};
 export type Escrow = {
   id: number;
   booking_id: number;
