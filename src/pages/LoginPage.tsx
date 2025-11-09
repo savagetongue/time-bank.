@@ -50,7 +50,6 @@ export function LoginPage() {
       toast.success("Login successful!");
       navigate("/dashboard");
     } else {
-      // This check narrows the type of `response` to `ApiErrorResponse`
       toast.error(response.error || "Login failed. Please check your credentials.");
     }
   }

@@ -32,6 +32,14 @@ export type Offer = {
   created_at: string;
   provider: Member; // Nested provider info
 };
+export type Request = {
+    id: number;
+    offer_id: number;
+    member_id: number;
+    note?: string;
+    status: 'OPEN' | 'MATCHED' | 'CANCELLED';
+    created_at: string;
+};
 export type ApiSuccessResponse<T> = {
   success: true;
   data: T;

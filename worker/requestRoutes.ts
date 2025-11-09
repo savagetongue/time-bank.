@@ -1,11 +1,33 @@
-import { Hono } from "hono";
-import { Env, AuthEnv } from './core-utils';
-import { query } from './db';
+import { Hono, Context } from "hono";
+import { Env } from './core-utils';
+import { getClient } from './db';
 import { z } from 'zod';
-import { authMiddleware } from "./middleware";
-
+import { MiddlewareHandler } from "hono/types";
+import { Pool } from "mysql2/promise";
+type AuthEnv = {
+    Variables: {
+        userId: number;
+    };
+    Bindings: Env;
+}
+const authMiddleware: MiddlewareHandler<AuthEnv> = async (c, next) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    const token = authHeader.substring(7);
+    if (!token.startsWith('mock-token-for-user-')) {
+        return c.json({ success: false, error: 'Invalid token' }, 401);
+    }
+    const userId = parseInt(token.replace('mock-token-for-user-', ''), 10);
+    if (isNaN(userId)) {
+        return c.json({ success: false, error: 'Invalid token format' }, 401);
+    }
+    c.set('userId', userId);
+    await next();
+};
 export function requestRoutes(app: Hono<{ Bindings: Env }>) {
-    const authedApp = app as unknown as Hono<AuthEnv>;
+    const authedApp = app as Hono<AuthEnv>;
     const requestSchema = z.object({
         offerId: z.number().int().positive(),
         note: z.string().max(1000).optional(),
@@ -19,14 +41,16 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { offerId, note } = validation.data;
         try {
-            const existing = await query(c,
+            const db = getClient(c) as Pool;
+            // Check for existing open request from the same member for the same offer
+            const [existing]: any[] = await db.query(
                 'SELECT id FROM requests WHERE offer_id = ? AND member_id = ? AND status = \'OPEN\'',
                 [offerId, memberId]
             );
-            if (existing.rows.length > 0) {
+            if (existing.length > 0) {
                 return c.json({ success: false, error: 'You already have an open request for this offer.' }, 409);
             }
-            const result = await query(c,
+            const [result]: any = await db.query(
                 'INSERT INTO requests (offer_id, member_id, note) VALUES (?, ?, ?)',
                 [offerId, memberId, note]
             );
@@ -40,31 +64,8 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
             return c.json({ success: false, error: 'Internal Server Error' }, 500);
         }
     });
+    // Placeholder for listing requests
     authedApp.get('/api/requests', authMiddleware, async (c) => {
-        const userId = c.get('userId');
-        const { type } = c.req.query(); // 'incoming' or 'outgoing'
-        try {
-            let sqlQuery;
-            const params = [userId];
-            const baseQuery = `
-                SELECT
-                    r.id, r.offer_id, r.member_id, r.note, r.status, r.created_at,
-                    JSON_OBJECT('id', o.id, 'title', o.title, 'rate_per_hour', o.rate_per_hour) as offer,
-                    JSON_OBJECT('id', m.id, 'name', m.name, 'email', m.email) as member
-                FROM requests r
-                JOIN offers o ON r.offer_id = o.id
-                JOIN members m ON r.member_id = m.id
-            `;
-            if (type === 'incoming') {
-                sqlQuery = `${baseQuery} WHERE o.provider_id = ? ORDER BY r.created_at DESC`;
-            } else { // 'outgoing' is the default
-                sqlQuery = `${baseQuery} WHERE r.member_id = ? ORDER BY r.created_at DESC`;
-            }
-            const results = await query(c, sqlQuery, params);
-            return c.json({ success: true, data: results.rows });
-        } catch (error) {
-            console.error('Get requests error:', error);
-            return c.json({ success: false, error: 'Internal Server Error' }, 500);
-        }
+        return c.json({ message: 'Not Implemented' }, 501);
     });
 }

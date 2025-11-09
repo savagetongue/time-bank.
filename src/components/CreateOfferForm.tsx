@@ -23,13 +23,14 @@ const offerFormSchema = z.object({
   skills: z.string().min(1, { message: "Please enter at least one skill, comma-separated." }),
   rate_per_hour: z.coerce.number().positive({ message: "Rate must be a positive number." }),
 });
+type OfferFormValues = z.infer<typeof offerFormSchema>;
 type CreateOfferFormProps = {
   onSuccess: (newOffer: Offer) => void;
   setOpen: (open: boolean) => void;
 };
 export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const form = useForm<z.infer<typeof offerFormSchema>>({
+  const form = useForm<OfferFormValues>({
     resolver: zodResolver(offerFormSchema),
     defaultValues: {
       title: "",
@@ -38,7 +39,7 @@ export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
       rate_per_hour: 0,
     },
   });
-  async function onSubmit(values: z.infer<typeof offerFormSchema>) {
+  async function onSubmit(values: OfferFormValues) {
     setIsLoading(true);
     const skillsArray = values.skills.split(',').map(s => s.trim()).filter(Boolean);
     const payload = {
@@ -49,9 +50,7 @@ export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
     setIsLoading(false);
     if (response.success) {
       toast.success("Offer created successfully!");
-      // We can't know the full offer object from this response,
-      // so we'll trigger a refetch in the parent component.
-      onSuccess({} as Offer); // Pass a dummy object or refetch
+      onSuccess({} as Offer); // Trigger refetch in parent
       setOpen(false);
     } else {
       toast.error(response.error || "Failed to create offer. Please try again.");
