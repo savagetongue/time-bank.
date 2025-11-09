@@ -1,23 +1,102 @@
 import { Hono } from "hono";
 import { Env } from './core-utils';
 import { getClient } from './db';
+import { z } from 'zod';
+import { User } from '@shared/types';
+// Helper for password hashing
+async function hashPassword(password: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
-    // This is a sample test route.
-    app.get('/api/test', (c) => c.json({ success: true, data: { name: 'this works' }}));
     // Test DB connection
     app.get('/api/db-test', async (c) => {
         try {
             const db = getClient(c);
-            const [rows] = await db.query('SELECT 1 + 1 AS solution');
+            // Use execute for prepared statements
+            const [rows] = await db.execute('SELECT 1 + 1 AS solution');
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('DB connection test failed:', error);
-            return c.json({ success: false, error: error.message }, 500);
+            // Type-safe error handling
+            const errorMessage = error instanceof Error ? error.message : 'An unknown database error occurred.';
+            return c.json({ success: false, error: errorMessage }, 500);
         }
     });
     // --- Auth & Account ---
-    app.post('/api/register', (c) => c.json({ message: 'Not Implemented' }, 501));
-    app.post('/api/login', (c) => c.json({ message: 'Not Implemented' }, 501));
+    const registerSchema = z.object({
+        name: z.string().min(2).max(150),
+        email: z.string().email(),
+        password: z.string().min(8),
+    });
+    app.post('/api/register', async (c) => {
+        const body = await c.req.json();
+        const validation = registerSchema.safeParse(body);
+        if (!validation.success) {
+            return c.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, 400);
+        }
+        const { name, email, password } = validation.data;
+        const password_hash = await hashPassword(password);
+        try {
+            const db = getClient(c);
+            const [result]: any = await db.execute(
+                'INSERT INTO members (name, email, password_hash) VALUES (?, ?, ?)',
+                [name, email, password_hash]
+            );
+            if (result.insertId) {
+                return c.json({ success: true, data: { memberId: result.insertId } });
+            } else {
+                return c.json({ success: false, error: 'Failed to create user' }, 500);
+            }
+        } catch (error: any) {
+            if (error.code === 'ER_DUP_ENTRY') {
+                return c.json({ success: false, error: 'An account with this email already exists.' }, 409);
+            }
+            console.error('Registration error:', error);
+            return c.json({ success: false, error: 'Internal Server Error' }, 500);
+        }
+    });
+    const loginSchema = z.object({
+        email: z.string().email(),
+        password: z.string().min(1),
+    });
+    app.post('/api/login', async (c) => {
+        const body = await c.req.json();
+        const validation = loginSchema.safeParse(body);
+        if (!validation.success) {
+            return c.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, 400);
+        }
+        const { email, password } = validation.data;
+        try {
+            const db = getClient(c);
+            const [rows]: any[] = await db.execute('SELECT id, name, email, password_hash, is_provider, created_at FROM members WHERE email = ?', [email]);
+            if (rows.length === 0) {
+                return c.json({ success: false, error: 'Invalid credentials' }, 401);
+            }
+            const user = rows[0];
+            const password_hash = await hashPassword(password);
+            if (password_hash !== user.password_hash) {
+                return c.json({ success: false, error: 'Invalid credentials' }, 401);
+            }
+            const userPayload: User = {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                roles: user.is_provider ? ['member', 'provider'] : ['member'],
+                is_provider: !!user.is_provider,
+                created_at: user.created_at,
+            };
+            // In a real app, you'd generate a proper JWT here.
+            const token = `mock-token-for-user-${user.id}`;
+            return c.json({ success: true, data: { user: userPayload, token } });
+        } catch (error) {
+            console.error('Login error:', error);
+            return c.json({ success: false, error: 'Internal Server Error' }, 500);
+        }
+    });
     app.get('/api/me', (c) => c.json({ message: 'Not Implemented' }, 501));
     // --- Members ---
     app.get('/api/members', (c) => c.json({ message: 'Not Implemented' }, 501));
