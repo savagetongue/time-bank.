@@ -11,6 +11,27 @@ export type AuthResponse = {
   user: User;
   token: string;
 };
+export type Member = {
+  id: number;
+  name: string;
+  email: string;
+  is_provider: boolean;
+  created_at: string;
+  // Optional fields for public profiles
+  rating?: number;
+  avatarUrl?: string;
+};
+export type Offer = {
+  id: number;
+  provider_id: number;
+  title: string;
+  description: string;
+  skills: string[];
+  rate_per_hour: number;
+  is_active: boolean;
+  created_at: string;
+  provider: Member; // Nested provider info
+};
 export type ApiSuccessResponse<T> = {
   success: true;
   data: T;

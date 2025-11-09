@@ -47,6 +47,7 @@ export function RegisterPage() {
       toast.success("Registration successful! Please log in.");
       navigate("/login");
     } else {
+      // This check narrows the type of `response` to `ApiErrorResponse`
       toast.error(response.error || "Registration failed. Please try again.");
     }
   }

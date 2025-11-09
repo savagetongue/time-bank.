@@ -1,16 +1,22 @@
 import { ApiResponse } from '@shared/types';
+import { useAuthStore } from './authStore';
 const BASE_URL = '/api';
 async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
+  const token = useAuthStore.getState().token;
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   try {
     const response = await fetch(`${BASE_URL}${endpoint}`, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
     });
     const data = await response.json();
     if (!response.ok) {
