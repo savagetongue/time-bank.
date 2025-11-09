@@ -34,16 +34,14 @@ export function LedgerPage() {
         api.get<LedgerEntry[]>('/ledger'),
         api.get<Balance>('/balance')
       ]);
-      if (ledgerRes.success) {
-        setLedger(ledgerRes.data);
-      } else {
+      if (!ledgerRes.success) {
         throw new Error(ledgerRes.error || "Failed to fetch ledger.");
       }
-      if (balanceRes.success) {
-        setBalance(balanceRes.data.balance);
-      } else {
+      if (!balanceRes.success) {
         throw new Error(balanceRes.error || "Failed to fetch balance.");
       }
+      setLedger(ledgerRes.data);
+      setBalance(balanceRes.data.balance);
     } catch (e: any) {
       setError(e.message);
     } finally {

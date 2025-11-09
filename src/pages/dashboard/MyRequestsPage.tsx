@@ -63,7 +63,7 @@ const RequestList = ({ type, onAccept, refetchTrigger }: { type: 'incoming' | 'o
     if (response.success) {
       setRequests(response.data);
     } else {
-      setError(response.error || `Failed to fetch ${type} requests.`);
+      setError(response.error ?? `Failed to fetch ${type} requests.`);
     }
     setIsLoading(false);
   }, [type]);

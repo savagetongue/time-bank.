@@ -46,22 +46,29 @@ export function ResolveDisputeForm({ dispute, onSuccess, setOpen }: ResolveDispu
     },
   });
   const resolution = form.watch("resolution");
-  async function onSubmit(values: ResolveDisputeFormValues) {
+  const onSubmit = async (values: ResolveDisputeFormValues) => {
     setIsLoading(true);
-    const payload = {
-      ...values,
-      refundAmount: values.resolution === 'RESOLVED' ? values.refundAmount : 0,
-    };
-    const response = await api.post(`/disputes/${dispute.id}/resolve`, payload);
-    setIsLoading(false);
-    if (response.success) {
-      toast.success("Dispute resolved successfully.");
-      onSuccess();
-      setOpen(false);
-    } else {
-      toast.error(response.error || "Failed to resolve dispute.");
+    try {
+      const payload = {
+        ...values,
+        refundAmount: values.resolution === 'RESOLVED' ? values.refundAmount : 0,
+      };
+      const response = await api.post(`/disputes/${dispute.id}/resolve`, payload);
+
+      if (response.success) {
+        toast.success("Dispute resolved successfully.");
+        onSuccess();
+        setOpen(false);
+      } else {
+        toast.error(response.error ?? "Failed to resolve dispute.");
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred.");
+      console.error("Failed to resolve dispute:", error);
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

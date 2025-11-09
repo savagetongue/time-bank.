@@ -27,16 +27,15 @@ export function AdminPage() {
         api.get<DisputeWithDetails[]>('/disputes'),
         api.get<TopProviderReport[]>('/reports/top-providers')
       ]);
-      if (disputesRes.success) {
-        setDisputes(disputesRes.data);
-      } else {
+      if (!disputesRes.success) {
         throw new Error(disputesRes.error || "Failed to fetch disputes.");
       }
-      if (providersRes.success) {
-        setTopProviders(providersRes.data);
-      } else {
+      setDisputes(disputesRes.data);
+
+      if (!providersRes.success) {
         throw new Error(providersRes.error || "Failed to fetch top providers.");
       }
+      setTopProviders(providersRes.data);
     } catch (e: any) {
       setError(e.message);
     } finally {

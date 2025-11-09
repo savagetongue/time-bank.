@@ -54,10 +54,10 @@ export function MyOffersPage() {
     setIsLoading(true);
     setError(null);
     const response = await api.get<Offer[]>('/me/offers');
-    if (response.success) {
-      setOffers(response.data);
-    } else {
+    if (!response.success) {
       setError(response.error || "Failed to fetch your offers.");
+    } else {
+      setOffers(response.data);
     }
     setIsLoading(false);
   };

@@ -38,14 +38,20 @@ export function LedgerAdjustmentForm({ onSuccess, setOpen }: LedgerAdjustmentFor
   });
   async function onSubmit(values: LedgerAdjustmentFormValues) {
     setIsLoading(true);
-    const response = await api.post('/admin/ledger-adjust', values);
-    setIsLoading(false);
-    if (response.success) {
-      toast.success("Ledger adjusted successfully.");
-      onSuccess();
-      setOpen(false);
-    } else {
-      toast.error(response.error || "Failed to adjust ledger.");
+    try {
+      const response = await api.post('/admin/ledger-adjust', values);
+      if (response.success) {
+        toast.success("Ledger adjusted successfully.");
+        onSuccess();
+        setOpen(false);
+      } else {
+        toast.error(response.error || "Failed to adjust ledger.");
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred.");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
     }
   }
   return (

@@ -21,8 +21,9 @@ const offerFormSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }).max(255),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   skills: z.string().min(1, { message: "Please enter at least one skill, comma-separated." }),
-  rate_per_hour: z.coerce.number().positive({ message: "Rate must be a positive number." }),
+  rate_per_hour: z.coerce.number({ invalid_type_error: "Rate must be a number." }).positive({ message: "Rate must be a positive number." }),
 });
+
 type OfferFormValues = z.infer<typeof offerFormSchema>;
 type CreateOfferFormProps = {
   onSuccess: (newOffer: Offer) => void;
@@ -46,11 +47,11 @@ export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
       ...values,
       skills: skillsArray,
     };
-    const response = await api.post<{ offerId: number }>('/offers', payload);
+    const response = await api.post<Offer>('/offers', payload);
     setIsLoading(false);
-    if (response.success) {
+    if (response.success && response.data) {
       toast.success("Offer created successfully!");
-      onSuccess({} as Offer); // Trigger refetch in parent
+      onSuccess(response.data); // Pass the full new offer object
       setOpen(false);
     } else {
       toast.error(response.error || "Failed to create offer. Please try again.");

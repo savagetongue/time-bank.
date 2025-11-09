@@ -44,7 +44,7 @@ export function RequestServiceForm({ offer, setOpen }: RequestServiceFormProps) 
       toast.success("Request sent successfully!");
       setOpen(false);
     } else {
-      toast.error(response.error || "Failed to send request. Please try again.");
+      toast.error(response.error ?? "Failed to send request. Please try again.");
     }
   }
   return (

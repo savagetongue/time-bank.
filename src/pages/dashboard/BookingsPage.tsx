@@ -115,7 +115,7 @@ export function BookingsPage() {
     if (response.success) {
       setBookings(response.data);
     } else {
-      setError(response.error || "Failed to fetch bookings.");
+      setError('error' in response ? response.error : "Failed to fetch bookings.");
     }
     setIsLoading(false);
   }, []);
@@ -128,7 +128,7 @@ export function BookingsPage() {
       toast.success("Booking completed successfully!");
       fetchBookings();
     } else {
-      toast.error(response.error || "Failed to complete booking.");
+      toast.error('error' in response ? response.error : "Failed to complete booking.");
     }
   };
   const handleOpenRatingForm = (booking: BookingWithDetails) => {

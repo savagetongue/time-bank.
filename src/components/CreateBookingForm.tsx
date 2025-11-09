@@ -42,19 +42,25 @@ export function CreateBookingForm({ request, onSuccess, setOpen }: CreateBooking
   const escrowAmount = (request.offer.rate_per_hour * (duration / 60)).toFixed(2);
   async function onSubmit(values: BookingFormValues) {
     setIsLoading(true);
-    const payload = {
-      requestId: request.id,
-      startTime: new Date(values.startTime).toISOString(),
-      durationMinutes: values.durationMinutes,
-    };
-    const response = await api.post<{ bookingId: number }>('/bookings', payload);
-    setIsLoading(false);
-    if (response.success) {
-      toast.success("Booking created successfully!");
-      onSuccess();
-      setOpen(false);
-    } else {
-      toast.error(response.error || "Failed to create booking. Please try again.");
+    try {
+      const payload = {
+        requestId: request.id,
+        startTime: new Date(values.startTime).toISOString(),
+        durationMinutes: values.durationMinutes,
+      };
+      const response = await api.post<{ bookingId: number }>('/bookings', payload);
+
+      if (response.success) {
+        toast.success("Booking created successfully!");
+        onSuccess();
+        setOpen(false);
+      } else {
+        toast.error(response.error || "Failed to create booking. Please try again.");
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   }
   return (

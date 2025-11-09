@@ -30,7 +30,10 @@ export function adminRoutes(app: Hono<{ Bindings: Env }>) {
             connection = await pool.getConnection();
             await connection.beginTransaction();
             // Get the latest balance for the member
-            const [balanceResult]: any[] = await connection.execute('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [memberId]);
+            const [balanceResult]: any[] = await connection.execute(
+                'SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
+                [memberId]
+            );
             const currentBalance = balanceResult.length > 0 ? parseFloat(balanceResult[0].balance_after) : 0;
             const newBalance = currentBalance + amount;
             // Insert the adjustment entry

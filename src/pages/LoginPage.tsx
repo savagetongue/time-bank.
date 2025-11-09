@@ -50,7 +50,7 @@ export function LoginPage() {
       toast.success("Login successful!");
       navigate("/dashboard");
     } else {
-      toast.error(response.error || "Login failed. Please check your credentials.");
+      toast.error(response.error.message || "Login failed. Please check your credentials.");
     }
   }
   return (
