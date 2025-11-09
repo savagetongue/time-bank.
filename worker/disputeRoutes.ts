@@ -21,7 +21,7 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
         let connection: PoolConnection | null = null;
         try {
             const pool = getDbPool(c);
-            connection = await pool.getConnection();
+            connection = await pool.getConnection() as PoolConnection;
             await connection.beginTransaction();
             const [bookings]: any[] = await connection.execute(
                 `SELECT b.status, r.member_id as requester_id, o.provider_id
@@ -113,7 +113,7 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
         let connection: PoolConnection | null = null;
         try {
             const pool = getDbPool(c);
-            connection = await pool.getConnection();
+            connection = await pool.getConnection() as PoolConnection;
             await connection.beginTransaction();
             const [disputes]: any[] = await connection.execute(
                 `SELECT d.id, d.status, d.booking_id, e.amount as escrow_amount, r.member_id as requester_id, o.provider_id

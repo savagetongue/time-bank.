@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { Env, AuthEnv } from './core-utils';
-import { getDbPool } from './db';
+import { query } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
 export function requestRoutes(app: Hono<{ Bindings: Env }>) {
@@ -18,15 +18,14 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { offerId, note } = validation.data;
         try {
-            const db = getDbPool(c);
-            const [existing]: any[] = await db.execute(
+            const existing = await query(c,
                 'SELECT id FROM requests WHERE offer_id = ? AND member_id = ? AND status = \'OPEN\'',
                 [offerId, memberId]
             );
             if (existing.length > 0) {
                 return c.json({ success: false, error: 'You already have an open request for this offer.' }, 409);
             }
-            const [result]: any = await db.execute(
+            const result = await query(c,
                 'INSERT INTO requests (offer_id, member_id, note) VALUES (?, ?, ?)',
                 [offerId, memberId, note]
             );
@@ -44,8 +43,7 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
         const userId = c.get('userId');
         const { type } = c.req.query(); // 'incoming' or 'outgoing'
         try {
-            const db = getDbPool(c);
-            let query;
+            let sqlQuery;
             const params = [userId];
             const baseQuery = `
                 SELECT
@@ -57,11 +55,11 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
                 JOIN members m ON r.member_id = m.id
             `;
             if (type === 'incoming') {
-                query = `${baseQuery} WHERE o.provider_id = ? ORDER BY r.created_at DESC`;
+                sqlQuery = `${baseQuery} WHERE o.provider_id = ? ORDER BY r.created_at DESC`;
             } else { // 'outgoing' is the default
-                query = `${baseQuery} WHERE r.member_id = ? ORDER BY r.created_at DESC`;
+                sqlQuery = `${baseQuery} WHERE r.member_id = ? ORDER BY r.created_at DESC`;
             }
-            const [rows] = await db.execute(query, params);
+            const rows = await query(c, sqlQuery, params);
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get requests error:', error);

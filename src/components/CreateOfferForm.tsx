@@ -21,7 +21,7 @@ const offerFormSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }).max(255),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   skills: z.string().min(1, { message: "Please enter at least one skill, comma-separated." }),
-  rate_per_hour: z.coerce.number({ invalid_type_error: "Rate must be a number." }).positive({ message: "Rate must be a positive number." }),
+  rate_per_hour: z.coerce.number().positive({ message: "Rate must be a positive number." }),
 });
 
 type OfferFormValues = z.infer<typeof offerFormSchema>;

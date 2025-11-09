@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { Env, AuthEnv } from './core-utils';
-import { getDbPool } from './db';
+import { query } from './db';
 import { z } from 'zod';
 import { User } from '@shared/types';
 import { authMiddleware } from "./middleware";
@@ -16,8 +16,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     app.get('/api/db-test', async (c) => {
         try {
-            const db = getDbPool(c);
-            const [rows] = await db.execute('SELECT 1 + 1 AS solution');
+            const [rows] = await query(c, 'SELECT 1 + 1 AS solution');
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('DB connection test failed:', error);
@@ -40,8 +39,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const { name, email, password } = validation.data;
         const password_hash = await hashPassword(password);
         try {
-            const db = getDbPool(c);
-            const [result]: any = await db.execute(
+            const [result]: any = await query(c,
                 'INSERT INTO members (name, email, password_hash) VALUES (?, ?, ?)',
                 [name, email, password_hash]
             );
@@ -70,8 +68,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { email, password } = validation.data;
         try {
-            const db = getDbPool(c);
-            const [rows]: any[] = await db.execute('SELECT id, name, email, password_hash, is_provider, created_at FROM members WHERE email = ?', [email]);
+            const [rows]: any[] = await query(c, 'SELECT id, name, email, password_hash, is_provider, created_at FROM members WHERE email = ?', [email]);
             if (rows.length === 0) {
                 return c.json({ success: false, error: 'Invalid credentials' }, 401);
             }
@@ -98,8 +95,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     authedApp.get('/api/me', authMiddleware, async (c) => {
         const userId = c.get('userId');
         try {
-            const db = getDbPool(c);
-            const [rows]: any[] = await db.execute('SELECT id, name, email, is_provider, created_at FROM members WHERE id = ?', [userId]);
+            const [rows]: any[] = await query(c, 'SELECT id, name, email, is_provider, created_at FROM members WHERE id = ?', [userId]);
             if (rows.length === 0) {
                 return c.json({ success: false, error: 'User not found' }, 404);
             }
@@ -121,8 +117,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     authedApp.get('/api/me/offers', authMiddleware, async (c) => {
         const userId = c.get('userId');
         try {
-            const db = getDbPool(c);
-            const [rows] = await db.execute('SELECT * FROM offers WHERE provider_id = ? ORDER BY created_at DESC', [userId]);
+            const [rows] = await query(c, 'SELECT * FROM offers WHERE provider_id = ? ORDER BY created_at DESC', [userId]);
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get my offers error:', error);
@@ -132,8 +127,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     // --- Members ---
     app.get('/api/members', async (c) => {
         try {
-            const db = getDbPool(c);
-            const [rows] = await db.execute('SELECT id, name, email, is_provider, created_at FROM members ORDER BY created_at DESC');
+            const [rows] = await query(c, 'SELECT id, name, email, is_provider, created_at FROM members ORDER BY created_at DESC');
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get members error:', error);
@@ -144,8 +138,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     app.get('/api/offers', async (c) => {
         const { limit } = c.req.query();
         try {
-            const db = getDbPool(c);
-            let query = `
+            let sql = `
                 SELECT
                     o.id, o.provider_id, o.title, o.description, o.skills, o.rate_per_hour, o.is_active, o.created_at,
                     JSON_OBJECT('id', m.id, 'name', m.name, 'email', m.email) as provider
@@ -156,10 +149,10 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
             `;
             const params: (string | number)[] = [];
             if (limit) {
-                query += ' LIMIT ?';
+                sql += ' LIMIT ?';
                 params.push(parseInt(limit, 10));
             }
-            const [rows] = await db.execute(query, params);
+            const [rows] = await query(c, sql, params);
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get offers error:', error);
@@ -181,8 +174,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { title, description, skills, rate_per_hour } = validation.data;
         try {
-            const db = getDbPool(c);
-            const [result]: any = await db.execute(
+            const [result]: any = await query(c,
                 'INSERT INTO offers (provider_id, title, description, skills, rate_per_hour) VALUES (?, ?, ?, ?, ?)',
                 [provider_id, title, description, JSON.stringify(skills), rate_per_hour]
             );

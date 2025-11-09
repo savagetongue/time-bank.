@@ -44,16 +44,21 @@ export function RatingForm({ booking, onSuccess, setOpen }: RatingFormProps) {
       bookingId: booking.id,
       ...values,
     };
-    const response = await api.post<{ ratingId: number }>('/ratings', payload);
-    setIsLoading(false);
-    if (!response.success) {
-      toast.error(response.error || "Failed to submit rating. Please try again.");
-      return;
+    try {
+      const response = await api.post<{ ratingId: number }>('/ratings', payload);
+      if (!response.success) {
+        toast.error(response.error || "Failed to submit rating. Please try again.");
+        return;
+      }
+  
+      toast.success("Thank you for your feedback!");
+      onSuccess();
+      setOpen(false);
+    } catch (error) {
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-
-    toast.success("Thank you for your feedback!");
-    onSuccess();
-    setOpen(false);
   }
   return (
     <Form {...form}>
