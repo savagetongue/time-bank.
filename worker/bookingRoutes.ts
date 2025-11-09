@@ -3,9 +3,9 @@ import { Env, AuthEnv } from './core-utils';
 import { getClient } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-import { PoolConnection } from "mysql2/promise";
+import { Pool, PoolConnection } from "mysql2/promise";
 export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
-    const authedApp = app as Hono<AuthEnv>;
+    const authedApp = app as unknown as Hono<AuthEnv>;
     const bookingSchema = z.object({
         requestId: z.number().int().positive(),
         startTime: z.string().datetime(),
@@ -21,7 +21,7 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
         const { requestId, startTime, durationMinutes } = validation.data;
         let connection: PoolConnection | null = null;
         try {
-            const pool = getClient(c);
+            const pool = getClient(c) as Pool;
             connection = await pool.getConnection();
             await connection.beginTransaction();
             const [requests]: any[] = await connection.query(
@@ -71,10 +71,11 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
     authedApp.get('/api/bookings', authMiddleware, async (c) => {
         const userId = c.get('userId');
         try {
-            const db = getClient(c);
+            const db = getClient(c) as Pool;
             const query = `
                 SELECT
                     b.*,
+                    rt.id as rating_id,
                     JSON_OBJECT('id', r.id, 'offer_id', r.offer_id, 'member_id', r.member_id, 'note', r.note, 'status', r.status, 'created_at', r.created_at) as request,
                     JSON_OBJECT('id', o.id, 'title', o.title, 'rate_per_hour', o.rate_per_hour) as offer,
                     JSON_OBJECT('id', p.id, 'name', p.name, 'email', p.email) as provider,
@@ -84,10 +85,11 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                 JOIN offers o ON r.offer_id = o.id
                 JOIN members p ON o.provider_id = p.id
                 JOIN members m ON r.member_id = m.id
+                LEFT JOIN ratings rt ON rt.booking_id = b.id AND rt.rater_id = ?
                 WHERE o.provider_id = ? OR r.member_id = ?
                 ORDER BY b.start_time DESC
             `;
-            const [rows] = await db.query(query, [userId, userId]);
+            const [rows] = await db.query(query, [userId, userId, userId]);
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get bookings error:', error);
@@ -102,7 +104,7 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
         }
         let connection: PoolConnection | null = null;
         try {
-            const pool = getClient(c);
+            const pool = getClient(c) as Pool;
             connection = await pool.getConnection();
             await connection.beginTransaction();
             const [bookings]: any[] = await connection.query(

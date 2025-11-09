@@ -3,8 +3,9 @@ import { Env, AuthEnv } from './core-utils';
 import { getClient } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
+import { Pool } from "mysql2/promise";
 export function requestRoutes(app: Hono<{ Bindings: Env }>) {
-    const authedApp = app as Hono<AuthEnv>;
+    const authedApp = app as unknown as Hono<AuthEnv>;
     const requestSchema = z.object({
         offerId: z.number().int().positive(),
         note: z.string().max(1000).optional(),
@@ -18,7 +19,7 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { offerId, note } = validation.data;
         try {
-            const db = getClient(c);
+            const db = getClient(c) as Pool;
             // Check for existing open request from the same member for the same offer
             const [existing]: any[] = await db.query(
                 'SELECT id FROM requests WHERE offer_id = ? AND member_id = ? AND status = \'OPEN\'',
@@ -46,7 +47,7 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
         const userId = c.get('userId');
         const { type } = c.req.query(); // 'incoming' or 'outgoing'
         try {
-            const db = getClient(c);
+            const db = getClient(c) as Pool;
             let query;
             const params = [userId];
             const baseQuery = `

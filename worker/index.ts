@@ -5,6 +5,7 @@ import { logger } from 'hono/logger';
 import { userRoutes } from './userRoutes';
 import { requestRoutes } from './requestRoutes';
 import { bookingRoutes } from './bookingRoutes';
+import { ratingsRoutes } from './ratingsRoutes';
 import { Env } from './core-utils';
 export interface ClientErrorReport {
   message: string;
@@ -25,6 +26,7 @@ app.use('/api/*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'PUT', 'DELE
 userRoutes(app);
 requestRoutes(app);
 bookingRoutes(app);
+ratingsRoutes(app);
 app.get('/api/health', (c) => c.json({ success: true, data: { status: 'healthy', timestamp: new Date().toISOString() }}));
 app.post('/api/client-errors', async (c) => {
   try {

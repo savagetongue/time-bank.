@@ -6,17 +6,26 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle, Clock, User, Briefcase, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle, Star, User, Briefcase, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, formatDistanceToNow } from "date-fns";
 import { useAuthStore } from "@/lib/authStore";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-const BookingCard = ({ booking, role, onComplete }: { booking: BookingWithDetails, role: 'provider' | 'requester', onComplete: (bookingId: number) => Promise<void> }) => {
+import { RatingForm } from "@/components/RatingForm";
+const BookingCard = ({ booking, role, onComplete, onRate }: { booking: BookingWithDetails, role: 'provider' | 'requester', onComplete: (bookingId: number) => Promise<void>, onRate: (booking: BookingWithDetails) => void }) => {
   const [isCompleting, setIsCompleting] = useState(false);
   const otherParty = role === 'provider' ? booking.member : booking.provider;
   const handleComplete = async () => {
@@ -48,21 +57,27 @@ const BookingCard = ({ booking, role, onComplete }: { booking: BookingWithDetail
           Booked {formatDistanceToNow(new Date(booking.created_at), { addSuffix: true })}
         </p>
       </CardContent>
-      {role === 'provider' && booking.status === 'PENDING' && (
-        <div className="p-6 pt-0">
+      <CardFooter>
+        {role === 'provider' && booking.status === 'PENDING' && (
           <Button onClick={handleComplete} disabled={isCompleting}>
             {isCompleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
             Mark as Complete
           </Button>
-        </div>
-      )}
+        )}
+        {booking.status === 'COMPLETED' && !booking.rating_id && (
+           <Button variant="outline" onClick={() => onRate(booking)}>
+             <Star className="mr-2 h-4 w-4" />
+             Leave a Review
+           </Button>
+        )}
+      </CardFooter>
     </Card>
   );
 };
-const BookingList = ({ role, bookings, onComplete }: { role: 'provider' | 'requester', bookings: BookingWithDetails[], onComplete: (bookingId: number) => Promise<void> }) => {
+const BookingList = ({ role, bookings, onComplete, onRate }: { role: 'provider' | 'requester', bookings: BookingWithDetails[], onComplete: (bookingId: number) => Promise<void>, onRate: (booking: BookingWithDetails) => void }) => {
   return bookings.length > 0 ? (
     <div className="space-y-4">
-      {bookings.map(b => <BookingCard key={b.id} booking={b} role={role} onComplete={onComplete} />)}
+      {bookings.map(b => <BookingCard key={b.id} booking={b} role={role} onComplete={onComplete} onRate={onRate} />)}
     </div>
   ) : (
     <div className="text-center py-10 border-2 border-dashed rounded-lg">
@@ -75,6 +90,8 @@ export function BookingsPage() {
   const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRatingFormOpen, setIsRatingFormOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<BookingWithDetails | null>(null);
   const userId = useAuthStore(s => s.user?.id);
   const fetchBookings = useCallback(async () => {
     setIsLoading(true);
@@ -99,6 +116,13 @@ export function BookingsPage() {
       toast.error(response.error || "Failed to complete booking.");
     }
   };
+  const handleOpenRatingForm = (booking: BookingWithDetails) => {
+    setSelectedBooking(booking);
+    setIsRatingFormOpen(true);
+  };
+  const handleRatingSuccess = () => {
+    fetchBookings();
+  };
   const providerBookings = bookings.filter(b => b.provider.id === userId);
   const requesterBookings = bookings.filter(b => b.member.id === userId);
   if (isLoading) {
@@ -122,29 +146,42 @@ export function BookingsPage() {
     );
   }
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>My Bookings</CardTitle>
-        <CardDescription>View your past and upcoming service bookings.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="requester">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="requester">
-              <User className="mr-2 h-4 w-4" /> As Requester
-            </TabsTrigger>
-            <TabsTrigger value="provider">
-              <Briefcase className="mr-2 h-4 w-4" /> As Provider
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="requester" className="pt-4">
-            <BookingList role="requester" bookings={requesterBookings} onComplete={handleCompleteBooking} />
-          </TabsContent>
-          <TabsContent value="provider" className="pt-4">
-            <BookingList role="provider" bookings={providerBookings} onComplete={handleCompleteBooking} />
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+    <Dialog open={isRatingFormOpen} onOpenChange={setIsRatingFormOpen}>
+      <Card>
+        <CardHeader>
+          <CardTitle>My Bookings</CardTitle>
+          <CardDescription>View your past and upcoming service bookings.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="requester">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="requester">
+                <User className="mr-2 h-4 w-4" /> As Requester
+              </TabsTrigger>
+              <TabsTrigger value="provider">
+                <Briefcase className="mr-2 h-4 w-4" /> As Provider
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="requester" className="pt-4">
+              <BookingList role="requester" bookings={requesterBookings} onComplete={handleCompleteBooking} onRate={handleOpenRatingForm} />
+            </TabsContent>
+            <TabsContent value="provider" className="pt-4">
+              <BookingList role="provider" bookings={providerBookings} onComplete={handleCompleteBooking} onRate={handleOpenRatingForm} />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+      {selectedBooking && (
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Review: {selectedBooking.offer.title}</DialogTitle>
+            <DialogDescription>
+              Share your feedback for the service provided by {selectedBooking.provider.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <RatingForm booking={selectedBooking} onSuccess={handleRatingSuccess} setOpen={setIsRatingFormOpen} />
+        </DialogContent>
+      )}
+    </Dialog>
   );
 }

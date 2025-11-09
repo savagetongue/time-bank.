@@ -51,6 +51,7 @@ export type Booking = {
   duration_minutes: number;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED';
   created_at: string;
+  rating_id?: number | null;
 };
 export type BookingWithDetails = Booking & {
   request: Request;
@@ -63,6 +64,15 @@ export type Escrow = {
   booking_id: number;
   amount: number;
   status: 'HELD' | 'RELEASED' | 'REFUNDED';
+  created_at: string;
+};
+export type Rating = {
+  id: number;
+  booking_id: number;
+  rater_id: number;
+  ratee_id: number;
+  score: number;
+  comments?: string;
   created_at: string;
 };
 export type ApiSuccessResponse<T> = {
