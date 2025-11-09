@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import { DisputeWithDetails } from "@shared/types";
 import {
@@ -8,6 +8,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -20,24 +27,34 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { ResolveDisputeForm } from "@/components/ResolveDisputeForm";
 export function AdminPage() {
   const [disputes, setDisputes] = useState<DisputeWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    const fetchDisputes = async () => {
-      setIsLoading(true);
-      setError(null);
-      const response = await api.get<DisputeWithDetails[]>('/disputes');
-      if (response.success) {
-        setDisputes(response.data);
-      } else {
-        setError(response.error || "Failed to fetch disputes.");
-      }
-      setIsLoading(false);
-    };
-    fetchDisputes();
+  const [isResolveFormOpen, setIsResolveFormOpen] = useState(false);
+  const [selectedDispute, setSelectedDispute] = useState<DisputeWithDetails | null>(null);
+  const fetchDisputes = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    const response = await api.get<DisputeWithDetails[]>('/disputes');
+    if (response.success) {
+      setDisputes(response.data);
+    } else {
+      setError(response.error || "Failed to fetch disputes.");
+    }
+    setIsLoading(false);
   }, []);
+  useEffect(() => {
+    fetchDisputes();
+  }, [fetchDisputes]);
+  const handleOpenResolveForm = (dispute: DisputeWithDetails) => {
+    setSelectedDispute(dispute);
+    setIsResolveFormOpen(true);
+  };
+  const handleResolutionSuccess = () => {
+    fetchDisputes();
+  };
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -93,7 +110,7 @@ export function AdminPage() {
             </TableCell>
             <TableCell>{format(new Date(dispute.created_at), "MMM d, yyyy")}</TableCell>
             <TableCell>
-              <Button variant="outline" size="sm">Resolve</Button>
+              <Button variant="outline" size="sm" onClick={() => handleOpenResolveForm(dispute)}>Resolve</Button>
             </TableCell>
           </TableRow>
         ))}
@@ -101,30 +118,49 @@ export function AdminPage() {
     );
   };
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="py-8 md:py-10 lg:py-12">
-        <Card>
-          <CardHeader>
-            <CardTitle>Dispute Management</CardTitle>
-            <CardDescription>
-              Review and resolve open disputes between members.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">Booking ID</TableHead>
-                  <TableHead>Details</TableHead>
-                  <TableHead className="w-[150px]">Date Raised</TableHead>
-                  <TableHead className="w-[100px]">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              {renderContent()}
-            </Table>
-          </CardContent>
-        </Card>
+    <>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="py-8 md:py-10 lg:py-12">
+          <Card>
+            <CardHeader>
+              <CardTitle>Dispute Management</CardTitle>
+              <CardDescription>
+                Review and resolve open disputes between members.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px]">Booking ID</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead className="w-[150px]">Date Raised</TableHead>
+                    <TableHead className="w-[100px]">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                {renderContent()}
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+      <Dialog open={isResolveFormOpen} onOpenChange={setIsResolveFormOpen}>
+        {selectedDispute && (
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle>Resolve Dispute for Booking #{selectedDispute.booking_id}</DialogTitle>
+              <DialogDescription>
+                Review the details and take action. Your decision is final.
+              </DialogDescription>
+            </DialogHeader>
+            <ResolveDisputeForm
+              dispute={selectedDispute}
+              onSuccess={handleResolutionSuccess}
+              setOpen={setIsResolveFormOpen}
+            />
+          </DialogContent>
+        )}
+      </Dialog>
+    </>
   );
 }

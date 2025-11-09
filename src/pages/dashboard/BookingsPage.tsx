@@ -79,7 +79,7 @@ const BookingCard = ({ booking, role, onComplete, onRate, onDispute }: { booking
            </Button>
         )}
         {booking.status === 'COMPLETED' && !booking.dispute_id && (
-           <Button variant="destructive" outline onClick={() => onDispute(booking)}>
+           <Button variant="destructive" onClick={() => onDispute(booking)}>
              <ShieldAlert className="mr-2 h-4 w-4" />
              Raise Dispute
            </Button>

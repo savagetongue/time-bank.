@@ -121,7 +121,7 @@ export function LedgerPage() {
                 </div>
               </TableCell>
               <TableCell className="text-right">
-                <Badge variant={entry.amount >= 0 ? "default" : "destructive"} className="font-mono">
+                <Badge variant={entry.amount > 0 ? "default" : "destructive"} className="font-mono">
                   {entry.amount > 0 ? '+' : ''}{entry.amount.toFixed(2)}
                 </Badge>
               </TableCell>

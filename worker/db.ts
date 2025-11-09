@@ -18,5 +18,5 @@ export function getClient(c: Context): Pool {
       queueLimit: 0,
     });
   }
-  return pool;
+  return pool as Pool;
 }

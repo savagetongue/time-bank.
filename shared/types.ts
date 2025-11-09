@@ -88,6 +88,18 @@ export type DisputeWithDetails = Dispute & {
     requester: { id: number; name: string };
     provider: { id: number; name: string };
 };
+export type LedgerEntry = {
+    id: number;
+    booking_id?: number;
+    amount: number;
+    txn_type: 'CREDIT' | 'DEBIT' | 'ADJUSTMENT' | 'REFUND';
+    balance_after: number;
+    notes?: string;
+    created_at: string;
+};
+export type Balance = {
+    balance: number;
+};
 export type ApiSuccessResponse<T> = {
   success: true;
   data: T;

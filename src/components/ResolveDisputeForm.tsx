@@ -27,7 +27,7 @@ import { DisputeWithDetails } from "@shared/types";
 const resolveDisputeSchema = z.object({
   resolution: z.enum(['RESOLVED', 'REJECTED']),
   resolutionNotes: z.string().optional(),
-  refundAmount: z.coerce.number().min(0).optional().default(0),
+  refundAmount: z.coerce.number().min(0).optional(),
 });
 type ResolveDisputeFormValues = z.infer<typeof resolveDisputeSchema>;
 type ResolveDisputeFormProps = {
@@ -46,28 +46,22 @@ export function ResolveDisputeForm({ dispute, onSuccess, setOpen }: ResolveDispu
     },
   });
   const resolution = form.watch("resolution");
-  const onSubmit = async (values: ResolveDisputeFormValues) => {
+  async function onSubmit(values: ResolveDisputeFormValues) {
     setIsLoading(true);
-    try {
-      const payload = {
-        ...values,
-        refundAmount: values.resolution === 'RESOLVED' ? values.refundAmount : 0,
-      };
-      const response = await api.post(`/disputes/${dispute.id}/resolve`, payload);
-      if (response.success) {
-        toast.success("Dispute resolved successfully.");
-        onSuccess();
-        setOpen(false);
-      } else {
-        toast.error(response.error || "Failed to resolve dispute.");
-      }
-    } catch (error) {
-      toast.error("An unexpected error occurred.");
-      console.error("Failed to resolve dispute:", error);
-    } finally {
-      setIsLoading(false);
+    const payload = {
+      ...values,
+      refundAmount: values.resolution === 'RESOLVED' ? values.refundAmount : 0,
+    };
+    const response = await api.post(`/disputes/${dispute.id}/resolve`, payload);
+    setIsLoading(false);
+    if (response.success) {
+      toast.success("Dispute resolved successfully.");
+      onSuccess();
+      setOpen(false);
+    } else {
+      toast.error(response.error || "Failed to resolve dispute.");
     }
-  };
+  }
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

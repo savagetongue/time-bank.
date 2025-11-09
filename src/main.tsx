@@ -25,6 +25,7 @@ import { ProfilePage } from '@/pages/dashboard/ProfilePage';
 import { MyOffersPage } from '@/pages/dashboard/MyOffersPage';
 import { MyRequestsPage } from '@/pages/dashboard/MyRequestsPage';
 import { BookingsPage } from '@/pages/dashboard/BookingsPage';
+import { LedgerPage } from '@/pages/dashboard/LedgerPage';
 import { SettingsPage } from '@/pages/dashboard/SettingsPage';
 const router = createBrowserRouter([
   {
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
           { path: "offers", element: <MyOffersPage /> },
           { path: "requests", element: <MyRequestsPage /> },
           { path: "bookings", element: <BookingsPage /> },
+          { path: "ledger", element: <LedgerPage /> },
           { path: "settings", element: <SettingsPage /> },
         ]
       },

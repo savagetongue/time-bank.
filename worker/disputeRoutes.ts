@@ -3,7 +3,7 @@ import { Env, AuthEnv } from './core-utils';
 import { getClient } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-import { Pool } from "mysql2/promise";
+import { Pool, PoolConnection } from "mysql2/promise";
 export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     const disputeSchema = z.object({
@@ -89,6 +89,83 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
         } catch (error) {
             console.error('Get disputes error:', error);
             return c.json({ success: false, error: 'Internal Server Error' }, 500);
+        }
+    });
+    const resolveDisputeSchema = z.object({
+        resolution: z.enum(['RESOLVED', 'REJECTED']),
+        resolutionNotes: z.string().optional(),
+        refundAmount: z.number().min(0).optional(),
+    });
+    authedApp.post('/api/disputes/:id/resolve', authMiddleware, async (c) => {
+        const adminId = c.get('userId');
+        const disputeId = parseInt(c.req.param('id'), 10);
+        const body = await c.req.json();
+        const validation = resolveDisputeSchema.safeParse(body);
+        if (!validation.success) {
+            return c.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, 400);
+        }
+        const { resolution, resolutionNotes, refundAmount } = validation.data;
+        let connection: PoolConnection | null = null;
+        try {
+            const pool = getClient(c) as Pool;
+            connection = await pool.getConnection();
+            await connection.beginTransaction();
+            const [disputes]: any[] = await connection.query(
+                `SELECT d.id, d.status, d.booking_id, e.amount as escrow_amount, r.member_id as requester_id, o.provider_id
+                 FROM disputes d
+                 JOIN bookings b ON d.booking_id = b.id
+                 JOIN escrow e ON b.id = e.booking_id
+                 JOIN requests r ON b.request_id = r.id
+                 JOIN offers o ON r.offer_id = o.id
+                 WHERE d.id = ?`,
+                [disputeId]
+            );
+            if (disputes.length === 0) {
+                await connection.rollback();
+                return c.json({ success: false, error: 'Dispute not found.' }, 404);
+            }
+            const dispute = disputes[0];
+            if (dispute.status !== 'OPEN') {
+                await connection.rollback();
+                return c.json({ success: false, error: 'Dispute is already closed.' }, 409);
+            }
+            await connection.query(
+                'UPDATE disputes SET status = ?, resolved_by_admin_id = ?, resolution_notes = ? WHERE id = ?',
+                [resolution, adminId, resolutionNotes, disputeId]
+            );
+            if (resolution === 'RESOLVED' && refundAmount && refundAmount > 0) {
+                if (refundAmount > dispute.escrow_amount) {
+                    await connection.rollback();
+                    return c.json({ success: false, error: 'Refund amount cannot exceed escrowed amount.' }, 400);
+                }
+                await connection.query('UPDATE escrow SET status = \'REFUNDED\' WHERE booking_id = ?', [dispute.booking_id]);
+                await connection.query('UPDATE bookings SET status = \'CANCELLED\' WHERE id = ?', [dispute.booking_id]);
+                // Refund to requester
+                const [reqBalanceResult]: any[] = await connection.query('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.requester_id]);
+                const reqBalance = reqBalanceResult.length > 0 ? parseFloat(reqBalanceResult[0].balance_after) : 0;
+                await connection.query(
+                    'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
+                    [dispute.requester_id, dispute.booking_id, refundAmount, 'REFUND', reqBalance + refundAmount, `Refund for disputed booking #${dispute.booking_id}`]
+                );
+                // Adjustment for provider
+                const [provBalanceResult]: any[] = await connection.query('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.provider_id]);
+                const provBalance = provBalanceResult.length > 0 ? parseFloat(provBalanceResult[0].balance_after) : 0;
+                await connection.query(
+                    'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
+                    [dispute.provider_id, dispute.booking_id, -refundAmount, 'ADJUSTMENT', provBalance - refundAmount, `Adjustment for disputed booking #${dispute.booking_id}`]
+                );
+            } else {
+                // If rejected or no refund, booking remains completed
+                await connection.query('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [dispute.booking_id]);
+            }
+            await connection.commit();
+            return c.json({ success: true, data: { disputeId } });
+        } catch (error) {
+            if (connection) await connection.rollback();
+            console.error('Resolve dispute error:', error);
+            return c.json({ success: false, error: 'Internal Server Error' }, 500);
+        } finally {
+            if (connection) connection.release();
         }
     });
 }
