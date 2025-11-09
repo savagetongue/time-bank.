@@ -18,14 +18,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle, Star, User, Briefcase, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle, Star, User, Briefcase, Loader2, ShieldAlert } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, formatDistanceToNow } from "date-fns";
 import { useAuthStore } from "@/lib/authStore";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { RatingForm } from "@/components/RatingForm";
-const BookingCard = ({ booking, role, onComplete, onRate }: { booking: BookingWithDetails, role: 'provider' | 'requester', onComplete: (bookingId: number) => Promise<void>, onRate: (booking: BookingWithDetails) => void }) => {
+import { DisputeForm } from "@/components/DisputeForm";
+const BookingCard = ({ booking, role, onComplete, onRate, onDispute }: { booking: BookingWithDetails, role: 'provider' | 'requester', onComplete: (bookingId: number) => Promise<void>, onRate: (booking: BookingWithDetails) => void, onDispute: (booking: BookingWithDetails) => void }) => {
   const [isCompleting, setIsCompleting] = useState(false);
   const otherParty = role === 'provider' ? booking.member : booking.provider;
   const handleComplete = async () => {
@@ -33,6 +34,13 @@ const BookingCard = ({ booking, role, onComplete, onRate }: { booking: BookingWi
     await onComplete(booking.id);
     setIsCompleting(false);
   };
+  const statusColors = {
+    PENDING: 'secondary',
+    COMPLETED: 'default',
+    DISPUTED: 'destructive',
+    CANCELLED: 'outline',
+    IN_PROGRESS: 'secondary',
+  } as const;
   return (
     <Card className="transition-shadow hover:shadow-md">
       <CardHeader>
@@ -43,7 +51,7 @@ const BookingCard = ({ booking, role, onComplete, onRate }: { booking: BookingWi
               {role === 'provider' ? `With ${otherParty.name}` : `By ${otherParty.name}`}
             </CardDescription>
           </div>
-          <Badge variant={booking.status === 'COMPLETED' ? 'default' : 'secondary'}>{booking.status}</Badge>
+          <Badge variant={statusColors[booking.status] || 'secondary'}>{booking.status}</Badge>
         </div>
       </CardHeader>
       <CardContent>
@@ -57,27 +65,33 @@ const BookingCard = ({ booking, role, onComplete, onRate }: { booking: BookingWi
           Booked {formatDistanceToNow(new Date(booking.created_at), { addSuffix: true })}
         </p>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex flex-wrap gap-2">
         {role === 'provider' && booking.status === 'PENDING' && (
           <Button onClick={handleComplete} disabled={isCompleting}>
             {isCompleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
             Mark as Complete
           </Button>
         )}
-        {booking.status === 'COMPLETED' && !booking.rating_id && (
+        {booking.status === 'COMPLETED' && !booking.rating_id && !booking.dispute_id && (
            <Button variant="outline" onClick={() => onRate(booking)}>
              <Star className="mr-2 h-4 w-4" />
              Leave a Review
+           </Button>
+        )}
+        {booking.status === 'COMPLETED' && !booking.dispute_id && (
+           <Button variant="destructive" outline onClick={() => onDispute(booking)}>
+             <ShieldAlert className="mr-2 h-4 w-4" />
+             Raise Dispute
            </Button>
         )}
       </CardFooter>
     </Card>
   );
 };
-const BookingList = ({ role, bookings, onComplete, onRate }: { role: 'provider' | 'requester', bookings: BookingWithDetails[], onComplete: (bookingId: number) => Promise<void>, onRate: (booking: BookingWithDetails) => void }) => {
+const BookingList = ({ role, bookings, onComplete, onRate, onDispute }: { role: 'provider' | 'requester', bookings: BookingWithDetails[], onComplete: (bookingId: number) => Promise<void>, onRate: (booking: BookingWithDetails) => void, onDispute: (booking: BookingWithDetails) => void }) => {
   return bookings.length > 0 ? (
     <div className="space-y-4">
-      {bookings.map(b => <BookingCard key={b.id} booking={b} role={role} onComplete={onComplete} onRate={onRate} />)}
+      {bookings.map(b => <BookingCard key={b.id} booking={b} role={role} onComplete={onComplete} onRate={onRate} onDispute={onDispute} />)}
     </div>
   ) : (
     <div className="text-center py-10 border-2 border-dashed rounded-lg">
@@ -91,6 +105,7 @@ export function BookingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRatingFormOpen, setIsRatingFormOpen] = useState(false);
+  const [isDisputeFormOpen, setIsDisputeFormOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<BookingWithDetails | null>(null);
   const userId = useAuthStore(s => s.user?.id);
   const fetchBookings = useCallback(async () => {
@@ -111,7 +126,7 @@ export function BookingsPage() {
     const response = await api.post(`/bookings/${bookingId}/complete`, {});
     if (response.success) {
       toast.success("Booking completed successfully!");
-      fetchBookings(); // Refetch to update status
+      fetchBookings();
     } else {
       toast.error(response.error || "Failed to complete booking.");
     }
@@ -120,7 +135,11 @@ export function BookingsPage() {
     setSelectedBooking(booking);
     setIsRatingFormOpen(true);
   };
-  const handleRatingSuccess = () => {
+  const handleOpenDisputeForm = (booking: BookingWithDetails) => {
+    setSelectedBooking(booking);
+    setIsDisputeFormOpen(true);
+  };
+  const handleFormSuccess = () => {
     fetchBookings();
   };
   const providerBookings = bookings.filter(b => b.provider.id === userId);
@@ -146,7 +165,7 @@ export function BookingsPage() {
     );
   }
   return (
-    <Dialog open={isRatingFormOpen} onOpenChange={setIsRatingFormOpen}>
+    <>
       <Card>
         <CardHeader>
           <CardTitle>My Bookings</CardTitle>
@@ -163,25 +182,40 @@ export function BookingsPage() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="requester" className="pt-4">
-              <BookingList role="requester" bookings={requesterBookings} onComplete={handleCompleteBooking} onRate={handleOpenRatingForm} />
+              <BookingList role="requester" bookings={requesterBookings} onComplete={handleCompleteBooking} onRate={handleOpenRatingForm} onDispute={handleOpenDisputeForm} />
             </TabsContent>
             <TabsContent value="provider" className="pt-4">
-              <BookingList role="provider" bookings={providerBookings} onComplete={handleCompleteBooking} onRate={handleOpenRatingForm} />
+              <BookingList role="provider" bookings={providerBookings} onComplete={handleCompleteBooking} onRate={handleOpenRatingForm} onDispute={handleOpenDisputeForm} />
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
-      {selectedBooking && (
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Review: {selectedBooking.offer.title}</DialogTitle>
-            <DialogDescription>
-              Share your feedback for the service provided by {selectedBooking.provider.name}.
-            </DialogDescription>
-          </DialogHeader>
-          <RatingForm booking={selectedBooking} onSuccess={handleRatingSuccess} setOpen={setIsRatingFormOpen} />
-        </DialogContent>
-      )}
-    </Dialog>
+      <Dialog open={isRatingFormOpen} onOpenChange={setIsRatingFormOpen}>
+        {selectedBooking && (
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Review: {selectedBooking.offer.title}</DialogTitle>
+              <DialogDescription>
+                Share your feedback for the service provided by {selectedBooking.provider.name}.
+              </DialogDescription>
+            </DialogHeader>
+            <RatingForm booking={selectedBooking} onSuccess={handleFormSuccess} setOpen={setIsRatingFormOpen} />
+          </DialogContent>
+        )}
+      </Dialog>
+      <Dialog open={isDisputeFormOpen} onOpenChange={setIsDisputeFormOpen}>
+        {selectedBooking && (
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Dispute: {selectedBooking.offer.title}</DialogTitle>
+              <DialogDescription>
+                Please explain why you are disputing this completed service.
+              </DialogDescription>
+            </DialogHeader>
+            <DisputeForm booking={selectedBooking} onSuccess={handleFormSuccess} setOpen={setIsDisputeFormOpen} />
+          </DialogContent>
+        )}
+      </Dialog>
+    </>
   );
 }

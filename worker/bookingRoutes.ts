@@ -76,6 +76,7 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                 SELECT
                     b.*,
                     rt.id as rating_id,
+                    d.id as dispute_id,
                     JSON_OBJECT('id', r.id, 'offer_id', r.offer_id, 'member_id', r.member_id, 'note', r.note, 'status', r.status, 'created_at', r.created_at) as request,
                     JSON_OBJECT('id', o.id, 'title', o.title, 'rate_per_hour', o.rate_per_hour) as offer,
                     JSON_OBJECT('id', p.id, 'name', p.name, 'email', p.email) as provider,
@@ -86,6 +87,7 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                 JOIN members p ON o.provider_id = p.id
                 JOIN members m ON r.member_id = m.id
                 LEFT JOIN ratings rt ON rt.booking_id = b.id AND rt.rater_id = ?
+                LEFT JOIN disputes d ON d.booking_id = b.id
                 WHERE o.provider_id = ? OR r.member_id = ?
                 ORDER BY b.start_time DESC
             `;

@@ -6,6 +6,7 @@ import { userRoutes } from './userRoutes';
 import { requestRoutes } from './requestRoutes';
 import { bookingRoutes } from './bookingRoutes';
 import { ratingsRoutes } from './ratingsRoutes';
+import { disputeRoutes } from './disputeRoutes';
 import { Env } from './core-utils';
 export interface ClientErrorReport {
   message: string;
@@ -27,6 +28,7 @@ userRoutes(app);
 requestRoutes(app);
 bookingRoutes(app);
 ratingsRoutes(app);
+disputeRoutes(app);
 app.get('/api/health', (c) => c.json({ success: true, data: { status: 'healthy', timestamp: new Date().toISOString() }}));
 app.post('/api/client-errors', async (c) => {
   try {

@@ -35,24 +35,18 @@ export function DisputeForm({ booking, onSuccess, setOpen }: DisputeFormProps) {
   });
   async function onSubmit(values: DisputeFormValues) {
     setIsLoading(true);
-    try {
-      const payload = {
-        bookingId: booking.id,
-        reason: values.reason,
-      };
-      const response = await api.post<{ disputeId: number }>('/disputes', payload);
-      if (response.success) {
-        toast.success("Dispute raised successfully.");
-        onSuccess();
-        setOpen(false);
-      } else {
-        toast.error(response.error || "Failed to raise dispute. Please try again.");
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
+    const payload = {
+      bookingId: booking.id,
+      reason: values.reason,
+    };
+    const response = await api.post<{ disputeId: number }>('/disputes', payload);
+    setIsLoading(false);
+    if (response.success) {
+      toast.success("Dispute raised successfully.");
+      onSuccess();
+      setOpen(false);
+    } else {
+      toast.error(response.error || "Failed to raise dispute. Please try again.");
     }
   }
   return (

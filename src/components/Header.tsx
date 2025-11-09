@@ -10,11 +10,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LifeBuoy, LogOut, Settings, User as UserIcon } from 'lucide-react';
+import { LifeBuoy, LogOut, Settings, User as UserIcon, Shield } from 'lucide-react';
 export function Header() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const user = useAuthStore(s => s.user);
   const logout = useAuthStore(s => s.logout);
+  // Mock admin check. In a real app, this would come from user roles.
+  const isAdmin = user?.email === 'admin@timebank.com' || user?.id === 1;
   const navLinkClasses = ({ isActive }: { isActive: boolean }) =>
     `text-sm font-medium transition-colors hover:text-primary ${isActive ? 'text-primary' : 'text-muted-foreground'}`;
   return (
@@ -29,6 +31,7 @@ export function Header() {
             <nav className="hidden md:flex items-center gap-4">
               <NavLink to="/offers" className={navLinkClasses}>Offers</NavLink>
               {isAuthenticated && <NavLink to="/dashboard" className={navLinkClasses}>Dashboard</NavLink>}
+              {isAuthenticated && isAdmin && <NavLink to="/admin" className={navLinkClasses}>Admin</NavLink>}
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -50,18 +53,26 @@ export function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <UserIcon className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard/profile">
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard/settings">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <LifeBuoy className="mr-2 h-4 w-4" />
-                    <span>Support</span>
-                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                       <Link to="/admin">
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Admin Panel</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={logout}>
                     <LogOut className="mr-2 h-4 w-4" />

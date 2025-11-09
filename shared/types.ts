@@ -52,6 +52,7 @@ export type Booking = {
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED';
   created_at: string;
   rating_id?: number | null;
+  dispute_id?: number | null;
 };
 export type BookingWithDetails = Booking & {
   request: Request;
@@ -74,6 +75,18 @@ export type Rating = {
   score: number;
   comments?: string;
   created_at: string;
+};
+export type Dispute = {
+    id: number;
+    booking_id: number;
+    reason: string;
+    status: 'OPEN' | 'RESOLVED' | 'REJECTED';
+    created_at: string;
+};
+export type DisputeWithDetails = Dispute & {
+    booking: { id: number; start_time: string };
+    requester: { id: number; name: string };
+    provider: { id: number; name: string };
 };
 export type ApiSuccessResponse<T> = {
   success: true;

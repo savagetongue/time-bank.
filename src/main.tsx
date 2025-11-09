@@ -5,6 +5,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   createBrowserRouter,
+  Navigate,
   RouterProvider,
 } from "react-router-dom";
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -38,6 +39,7 @@ const router = createBrowserRouter([
         path: "/dashboard",
         element: <DashboardPage />,
         children: [
+          { index: true, element: <Navigate to="profile" replace /> },
           { path: "profile", element: <ProfilePage /> },
           { path: "offers", element: <MyOffersPage /> },
           { path: "requests", element: <MyRequestsPage /> },
@@ -45,7 +47,13 @@ const router = createBrowserRouter([
           { path: "settings", element: <SettingsPage /> },
         ]
       },
-      { path: "/admin", element: <AdminPage /> },
+      {
+        path: "/admin",
+        children: [
+          { index: true, element: <Navigate to="disputes" replace /> },
+          { path: "disputes", element: <AdminPage /> },
+        ]
+      },
     ]
   },
 ]);
