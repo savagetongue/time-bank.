@@ -40,6 +40,25 @@ export type Request = {
     status: 'OPEN' | 'MATCHED' | 'CANCELLED';
     created_at: string;
 };
+export type RequestWithDetails = Request & {
+  offer: Offer;
+  member: Member;
+};
+export type Booking = {
+  id: number;
+  request_id: number;
+  start_time: string;
+  duration_minutes: number;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED';
+  created_at: string;
+};
+export type Escrow = {
+  id: number;
+  booking_id: number;
+  amount: number;
+  status: 'HELD' | 'RELEASED' | 'REFUNDED';
+  created_at: string;
+};
 export type ApiSuccessResponse<T> = {
   success: true;
   data: T;

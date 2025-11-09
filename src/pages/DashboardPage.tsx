@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { User, Briefcase, BookOpen, Settings } from "lucide-react";
+import { User, Briefcase, BookOpen, Settings, Mail } from "lucide-react";
 const dashboardNavLinks = [
   { to: "/dashboard/profile", label: "Profile", icon: User },
   { to: "/dashboard/offers", label: "My Offers", icon: Briefcase },
+  { to: "/dashboard/requests", label: "My Requests", icon: Mail },
   { to: "/dashboard/bookings", label: "My Bookings", icon: BookOpen },
   { to: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

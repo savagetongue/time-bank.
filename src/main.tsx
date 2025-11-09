@@ -22,6 +22,7 @@ import { AdminPage } from '@/pages/AdminPage';
 // Dashboard Pages
 import { ProfilePage } from '@/pages/dashboard/ProfilePage';
 import { MyOffersPage } from '@/pages/dashboard/MyOffersPage';
+import { MyRequestsPage } from '@/pages/dashboard/MyRequestsPage';
 import { BookingsPage } from '@/pages/dashboard/BookingsPage';
 import { SettingsPage } from '@/pages/dashboard/SettingsPage';
 const router = createBrowserRouter([
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
         children: [
           { path: "profile", element: <ProfilePage /> },
           { path: "offers", element: <MyOffersPage /> },
+          { path: "requests", element: <MyRequestsPage /> },
           { path: "bookings", element: <BookingsPage /> },
           { path: "settings", element: <SettingsPage /> },
         ]

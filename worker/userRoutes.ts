@@ -1,50 +1,24 @@
-import { Hono, Context } from "hono";
-import { Env } from './core-utils';
+import { Hono } from "hono";
+import { Env, AuthEnv } from './core-utils';
 import { getClient } from './db';
 import { z } from 'zod';
 import { User } from '@shared/types';
-import { MiddlewareHandler } from "hono/types";
-import { Pool } from "mysql2/promise";
-// Define a typed environment for authenticated routes
-type AuthEnv = {
-    Variables: {
-        userId: number;
-    };
-    Bindings: Env;
-}
+import { authMiddleware } from "./middleware";
 // Helper for password hashing
 async function hashPassword(password: string): Promise<string> {
     const encoder = new TextEncoder();
     const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-26-disable-next-line', data);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
-// Auth Middleware (simple token check for now)
-const authMiddleware: MiddlewareHandler<AuthEnv> = async (c, next) => {
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return c.json({ success: false, error: 'Unauthorized' }, 401);
-    }
-    const token = authHeader.substring(7);
-    // In a real app, you'd verify a JWT. Here we just check our mock token format.
-    if (!token.startsWith('mock-token-for-user-')) {
-        return c.json({ success: false, error: 'Invalid token' }, 401);
-    }
-    const userId = parseInt(token.replace('mock-token-for-user-', ''), 10);
-    if (isNaN(userId)) {
-        return c.json({ success: false, error: 'Invalid token format' }, 401);
-    }
-    c.set('userId', userId);
-    await next();
-};
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as Hono<AuthEnv>;
     // Test DB connection
     app.get('/api/db-test', async (c) => {
         try {
             const db = getClient(c);
-            const [rows] = await (db as Pool).query('SELECT 1 + 1 AS solution');
+            const [rows] = await db.query('SELECT 1 + 1 AS solution');
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('DB connection test failed:', error);
@@ -68,7 +42,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const password_hash = await hashPassword(password);
         try {
             const db = getClient(c);
-            const [result]: any = await (db as Pool).query(
+            const [result]: any = await db.query(
                 'INSERT INTO members (name, email, password_hash) VALUES (?, ?, ?)',
                 [name, email, password_hash]
             );
@@ -98,7 +72,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const { email, password } = validation.data;
         try {
             const db = getClient(c);
-            const [rows]: any[] = await (db as Pool).query('SELECT id, name, email, password_hash, is_provider, created_at FROM members WHERE email = ?', [email]);
+            const [rows]: any[] = await db.query('SELECT id, name, email, password_hash, is_provider, created_at FROM members WHERE email = ?', [email]);
             if (rows.length === 0) {
                 return c.json({ success: false, error: 'Invalid credentials' }, 401);
             }
@@ -126,7 +100,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const userId = c.get('userId');
         try {
             const db = getClient(c);
-            const [rows]: any[] = await (db as Pool).query('SELECT id, name, email, is_provider, created_at FROM members WHERE id = ?', [userId]);
+            const [rows]: any[] = await db.query('SELECT id, name, email, is_provider, created_at FROM members WHERE id = ?', [userId]);
             if (rows.length === 0) {
                 return c.json({ success: false, error: 'User not found' }, 404);
             }
@@ -149,7 +123,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const userId = c.get('userId');
         try {
             const db = getClient(c);
-            const [rows] = await (db as Pool).query('SELECT * FROM offers WHERE provider_id = ? ORDER BY created_at DESC', [userId]);
+            const [rows] = await db.query('SELECT * FROM offers WHERE provider_id = ? ORDER BY created_at DESC', [userId]);
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get my offers error:', error);
@@ -160,7 +134,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     app.get('/api/members', async (c) => {
         try {
             const db = getClient(c);
-            const [rows] = await (db as Pool).query('SELECT id, name, email, is_provider, created_at FROM members ORDER BY created_at DESC');
+            const [rows] = await db.query('SELECT id, name, email, is_provider, created_at FROM members ORDER BY created_at DESC');
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get members error:', error);
@@ -183,12 +157,12 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
                 WHERE o.is_active = TRUE
                 ORDER BY o.created_at DESC
             `;
-            const params = [];
+            const params: (string | number)[] = [];
             if (limit) {
                 query += ' LIMIT ?';
                 params.push(parseInt(limit, 10));
             }
-            const [rows] = await (db as Pool).query(query, params);
+            const [rows] = await db.query(query, params);
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get offers error:', error);
@@ -211,7 +185,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const { title, description, skills, rate_per_hour } = validation.data;
         try {
             const db = getClient(c);
-            const [result]: any = await (db as Pool).query(
+            const [result]: any = await db.query(
                 'INSERT INTO offers (provider_id, title, description, skills, rate_per_hour) VALUES (?, ?, ?, ?, ?)',
                 [provider_id, title, description, JSON.stringify(skills), rate_per_hour]
             );
@@ -227,7 +201,6 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     });
     app.put('/api/offers/:id', (c) => c.json({ message: `Not Implemented for id: ${c.req.param('id')}` }, 501));
     // --- Bookings & Escrow ---
-    app.post('/api/bookings', (c) => c.json({ message: 'Not Implemented' }, 501));
     app.post('/api/bookings/:id/complete', (c) => c.json({ message: `Not Implemented for id: ${c.req.param('id')}` }, 501));
     app.post('/api/bookings/:id/cancel', (c) => c.json({ message: `Not Implemented for id: ${c.req.param('id')}` }, 501));
     // --- Ledger ---

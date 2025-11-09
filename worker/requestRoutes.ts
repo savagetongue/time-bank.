@@ -1,31 +1,8 @@
-import { Hono, Context } from "hono";
-import { Env } from './core-utils';
+import { Hono } from "hono";
+import { Env, AuthEnv } from './core-utils';
 import { getClient } from './db';
 import { z } from 'zod';
-import { MiddlewareHandler } from "hono/types";
-import { Pool } from "mysql2/promise";
-type AuthEnv = {
-    Variables: {
-        userId: number;
-    };
-    Bindings: Env;
-}
-const authMiddleware: MiddlewareHandler<AuthEnv> = async (c, next) => {
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return c.json({ success: false, error: 'Unauthorized' }, 401);
-    }
-    const token = authHeader.substring(7);
-    if (!token.startsWith('mock-token-for-user-')) {
-        return c.json({ success: false, error: 'Invalid token' }, 401);
-    }
-    const userId = parseInt(token.replace('mock-token-for-user-', ''), 10);
-    if (isNaN(userId)) {
-        return c.json({ success: false, error: 'Invalid token format' }, 401);
-    }
-    c.set('userId', userId);
-    await next();
-};
+import { authMiddleware } from "./middleware";
 export function requestRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as Hono<AuthEnv>;
     const requestSchema = z.object({
@@ -41,7 +18,7 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { offerId, note } = validation.data;
         try {
-            const db = getClient(c) as Pool;
+            const db = getClient(c);
             // Check for existing open request from the same member for the same offer
             const [existing]: any[] = await db.query(
                 'SELECT id FROM requests WHERE offer_id = ? AND member_id = ? AND status = \'OPEN\'',
@@ -64,8 +41,33 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
             return c.json({ success: false, error: 'Internal Server Error' }, 500);
         }
     });
-    // Placeholder for listing requests
+    // Get requests. For providers, it gets incoming requests. For members, it gets outgoing requests.
     authedApp.get('/api/requests', authMiddleware, async (c) => {
-        return c.json({ message: 'Not Implemented' }, 501);
+        const userId = c.get('userId');
+        const { type } = c.req.query(); // 'incoming' or 'outgoing'
+        try {
+            const db = getClient(c);
+            let query;
+            const params = [userId];
+            const baseQuery = `
+                SELECT
+                    r.id, r.offer_id, r.member_id, r.note, r.status, r.created_at,
+                    JSON_OBJECT('id', o.id, 'title', o.title, 'rate_per_hour', o.rate_per_hour) as offer,
+                    JSON_OBJECT('id', m.id, 'name', m.name, 'email', m.email) as member
+                FROM requests r
+                JOIN offers o ON r.offer_id = o.id
+                JOIN members m ON r.member_id = m.id
+            `;
+            if (type === 'incoming') {
+                query = `${baseQuery} WHERE o.provider_id = ? ORDER BY r.created_at DESC`;
+            } else { // 'outgoing' is the default
+                query = `${baseQuery} WHERE r.member_id = ? ORDER BY r.created_at DESC`;
+            }
+            const [rows] = await db.query(query, params);
+            return c.json({ success: true, data: rows });
+        } catch (error) {
+            console.error('Get requests error:', error);
+            return c.json({ success: false, error: 'Internal Server Error' }, 500);
+        }
     });
 }

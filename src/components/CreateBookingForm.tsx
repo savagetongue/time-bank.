@@ -21,9 +21,7 @@ const bookingFormSchema = z.object({
   startTime: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "Please select a valid date and time.",
   }),
-  durationMinutes: z.coerce.number({
-    invalid_type_error: "Duration must be a number.",
-  }).int().min(15, "Duration must be at least 15 minutes."),
+  durationMinutes: z.coerce.number().int().min(15, "Duration must be at least 15 minutes."),
 });
 type BookingFormValues = z.infer<typeof bookingFormSchema>;
 type CreateBookingFormProps = {
@@ -44,24 +42,19 @@ export function CreateBookingForm({ request, onSuccess, setOpen }: CreateBooking
   const escrowAmount = (request.offer.rate_per_hour * (duration / 60)).toFixed(2);
   async function onSubmit(values: BookingFormValues) {
     setIsLoading(true);
-    try {
-      const payload = {
-        requestId: request.id,
-        startTime: new Date(values.startTime).toISOString(),
-        durationMinutes: values.durationMinutes,
-      };
-      const response = await api.post<{ bookingId: number }>('/bookings', payload);
-      if (response.success) {
-        toast.success("Booking created successfully!");
-        onSuccess();
-        setOpen(false);
-      } else {
-        toast.error(response.error || "Failed to create booking. Please try again.");
-      }
-    } catch (error) {
-      toast.error("An unexpected error occurred. Please try again.");
-    } finally {
-      setIsLoading(false);
+    const payload = {
+      requestId: request.id,
+      startTime: new Date(values.startTime).toISOString(),
+      durationMinutes: values.durationMinutes,
+    };
+    const response = await api.post<{ bookingId: number }>('/bookings', payload);
+    setIsLoading(false);
+    if (response.success) {
+      toast.success("Booking created successfully!");
+      onSuccess();
+      setOpen(false);
+    } else {
+      toast.error(response.error || "Failed to create booking. Please try again.");
     }
   }
   return (
@@ -87,12 +80,7 @@ export function CreateBookingForm({ request, onSuccess, setOpen }: CreateBooking
             <FormItem>
               <FormLabel>Duration (in minutes)</FormLabel>
               <FormControl>
-                <Input
-                  type="number"
-                  step="15"
-                  {...field}
-                  disabled={isLoading}
-                />
+                <Input type="number" step="15" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
