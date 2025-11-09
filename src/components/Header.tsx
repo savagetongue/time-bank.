@@ -10,13 +10,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LifeBuoy, LogOut, Settings, User as UserIcon, Shield } from 'lucide-react';
+import { LifeBuoy, LogOut, Settings, User as UserIcon } from 'lucide-react';
 export function Header() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const user = useAuthStore(s => s.user);
   const logout = useAuthStore(s => s.logout);
-  // Mock admin check. In a real app, this would come from user roles.
-  const isAdmin = user?.email === 'admin@timebank.com' || user?.id === 1;
   const navLinkClasses = ({ isActive }: { isActive: boolean }) =>
     `text-sm font-medium transition-colors hover:text-primary ${isActive ? 'text-primary' : 'text-muted-foreground'}`;
   return (
@@ -26,12 +24,11 @@ export function Header() {
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>
-              <span className="font-bold text-lg">TimeBank</span>
+              <span className="font-bold text-lg">ChronoBank</span>
             </Link>
             <nav className="hidden md:flex items-center gap-4">
               <NavLink to="/offers" className={navLinkClasses}>Offers</NavLink>
               {isAuthenticated && <NavLink to="/dashboard" className={navLinkClasses}>Dashboard</NavLink>}
-              {isAuthenticated && isAdmin && <NavLink to="/admin" className={navLinkClasses}>Admin</NavLink>}
             </nav>
           </div>
           <div className="flex items-center gap-4">
@@ -53,26 +50,18 @@ export function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link to="/dashboard/profile">
-                      <UserIcon className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
-                    </Link>
+                  <DropdownMenuItem>
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/dashboard/settings">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
-                    </Link>
+                  <DropdownMenuItem>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
                   </DropdownMenuItem>
-                  {isAdmin && (
-                    <DropdownMenuItem asChild>
-                       <Link to="/admin">
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>Admin Panel</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
+                  <DropdownMenuItem>
+                    <LifeBuoy className="mr-2 h-4 w-4" />
+                    <span>Support</span>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={logout}>
                     <LogOut className="mr-2 h-4 w-4" />

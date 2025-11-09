@@ -1,4 +1,4 @@
--- TimeBank Database Schema
+-- ChronoBank Database Schema
 -- This schema defines all the tables required for the application.
 -- Members table: Stores user information including authentication details and roles.
 CREATE TABLE IF NOT EXISTS `members` (

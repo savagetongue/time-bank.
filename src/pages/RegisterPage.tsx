@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -21,8 +20,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
-import { Loader2 } from "lucide-react";
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
@@ -30,7 +27,6 @@ const formSchema = z.object({
 });
 export function RegisterPage() {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -39,16 +35,11 @@ export function RegisterPage() {
       password: "",
     },
   });
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true);
-    const response = await api.post('/register', values);
-    setIsLoading(false);
-    if (response.success) {
-      toast.success("Registration successful! Please log in.");
-      navigate("/login");
-    } else {
-      toast.error(response.error || "Registration failed. Please try again.");
-    }
+  function onSubmit(values: z.infer<typeof formSchema>) {
+    // Mock registration
+    console.log(values);
+    toast.success("Registration successful!");
+    navigate("/login");
   }
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -70,7 +61,7 @@ export function RegisterPage() {
                     <FormItem>
                       <FormLabel>Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Your Name" {...field} disabled={isLoading} />
+                        <Input placeholder="Your Name" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -83,7 +74,7 @@ export function RegisterPage() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="m@example.com" {...field} disabled={isLoading} />
+                        <Input placeholder="m@example.com" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -96,14 +87,13 @@ export function RegisterPage() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input type="password" {...field} disabled={isLoading} />
+                        <Input type="password" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button type="submit" className="w-full">
                   Create Account
                 </Button>
               </form>

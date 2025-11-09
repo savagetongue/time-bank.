@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { User } from '@shared/types';
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  roles: string[];
+}
 interface AuthState {
   user: User | null;
   token: string | null;
@@ -19,7 +24,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage', // unique name
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => localStorage), // (optional) by default, 'localStorage' is used
     }
   )
 );
