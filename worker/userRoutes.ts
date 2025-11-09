@@ -136,6 +136,17 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
             return c.json({ success: false, error: 'Internal Server Error' }, 500);
         }
     });
+    app.get('/api/me/offers', authMiddleware, async (c) => {
+        const userId = c.get('userId') as number;
+        try {
+            const db = getClient(c);
+            const [rows] = await db.query('SELECT * FROM offers WHERE provider_id = ? ORDER BY created_at DESC', [userId]);
+            return c.json({ success: true, data: rows });
+        } catch (error) {
+            console.error('Get my offers error:', error);
+            return c.json({ success: false, error: 'Internal Server Error' }, 500);
+        }
+    });
     // --- Members ---
     app.get('/api/members', async (c) => {
         try {
@@ -155,7 +166,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         try {
             const db = getClient(c);
             let query = `
-                SELECT 
+                SELECT
                     o.id, o.provider_id, o.title, o.description, o.skills, o.rate_per_hour, o.is_active, o.created_at,
                     JSON_OBJECT('id', m.id, 'name', m.name, 'email', m.email) as provider
                 FROM offers o

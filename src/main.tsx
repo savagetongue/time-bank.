@@ -5,14 +5,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   createBrowserRouter,
-  Outlet,
   RouterProvider,
 } from "react-router-dom";
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
 import '@/index.css'
 // Layout
-import { AppLayout } from '@/components/layout/AppLayout';
+import { RootLayout } from '@/components/layout/RootLayout';
 // Pages
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -20,11 +19,11 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import { OffersPage } from '@/pages/OffersPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { AdminPage } from '@/pages/AdminPage';
-const RootLayout = () => (
-  <AppLayout>
-    <Outlet />
-  </AppLayout>
-);
+// Dashboard Pages
+import { ProfilePage } from '@/pages/dashboard/ProfilePage';
+import { MyOffersPage } from '@/pages/dashboard/MyOffersPage';
+import { BookingsPage } from '@/pages/dashboard/BookingsPage';
+import { SettingsPage } from '@/pages/dashboard/SettingsPage';
 const router = createBrowserRouter([
   {
     element: <RootLayout />,
@@ -38,11 +37,10 @@ const router = createBrowserRouter([
         path: "/dashboard",
         element: <DashboardPage />,
         children: [
-          // Placeholder for nested dashboard routes
-          { path: "profile", element: <div>Profile Page</div> },
-          { path: "offers", element: <div>My Offers Page</div> },
-          { path: "bookings", element: <div>My Bookings Page</div> },
-          { path: "settings", element: <div>Settings Page</div> },
+          { path: "profile", element: <ProfilePage /> },
+          { path: "offers", element: <MyOffersPage /> },
+          { path: "bookings", element: <BookingsPage /> },
+          { path: "settings", element: <SettingsPage /> },
         ]
       },
       { path: "/admin", element: <AdminPage /> },

@@ -21,36 +21,37 @@ const offerFormSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }).max(255),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   skills: z.string().min(1, { message: "Please enter at least one skill, comma-separated." }),
-  rate_per_hour: z.coerce.number().min(0.01, { message: "Rate must be a positive number." }),
+  rate_per_hour: z.coerce.number().positive({ message: "Rate must be a positive number." }),
 });
-type OfferFormValues = z.infer<typeof offerFormSchema>;
 type CreateOfferFormProps = {
   onSuccess: (newOffer: Offer) => void;
   setOpen: (open: boolean) => void;
 };
 export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const form = useForm<OfferFormValues>({
+  const form = useForm<z.infer<typeof offerFormSchema>>({
     resolver: zodResolver(offerFormSchema),
     defaultValues: {
       title: "",
       description: "",
       skills: "",
-      rate_per_hour: 1,
+      rate_per_hour: 0,
     },
   });
-  async function onSubmit(values: OfferFormValues) {
+  async function onSubmit(values: z.infer<typeof offerFormSchema>) {
     setIsLoading(true);
     const skillsArray = values.skills.split(',').map(s => s.trim()).filter(Boolean);
     const payload = {
       ...values,
       skills: skillsArray,
     };
-    const response = await api.post<Offer>('/offers', payload);
+    const response = await api.post<{ offerId: number }>('/offers', payload);
     setIsLoading(false);
     if (response.success) {
       toast.success("Offer created successfully!");
-      onSuccess(response.data);
+      // We can't know the full offer object from this response,
+      // so we'll trigger a refetch in the parent component.
+      onSuccess({} as Offer); // Pass a dummy object or refetch
       setOpen(false);
     } else {
       toast.error(response.error || "Failed to create offer. Please try again.");
@@ -105,7 +106,7 @@ export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
             <FormItem>
               <FormLabel>Rate (credits per hour)</FormLabel>
               <FormControl>
-                <Input type="number" step="0.01" {...field} disabled={isLoading} />
+                <Input type="number" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
