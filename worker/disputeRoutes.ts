@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { Env, AuthEnv } from './core-utils';
-import { getClient } from './db';
+import { getDbPool } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-import { Pool, PoolConnection } from "mysql2/promise";
+import { PoolConnection } from "mysql2/promise";
 export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     const disputeSchema = z.object({
@@ -18,10 +18,12 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
             return c.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, 400);
         }
         const { bookingId, reason } = validation.data;
+        let connection: PoolConnection | null = null;
         try {
-            const db = getClient(c) as Pool;
-            // 1. Verify the booking exists, is completed, and the user is part of it
-            const [bookings]: any[] = await db.query(
+            const pool = getDbPool(c);
+            connection = await pool.getConnection();
+            await connection.beginTransaction();
+            const [bookings]: any[] = await connection.execute(
                 `SELECT b.status, r.member_id as requester_id, o.provider_id
                  FROM bookings b
                  JOIN requests r ON b.request_id = r.id
@@ -30,47 +32,50 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
                 [bookingId]
             );
             if (bookings.length === 0) {
+                await connection.rollback();
                 return c.json({ success: false, error: 'Booking not found.' }, 404);
             }
             const booking = bookings[0];
             const isParticipant = booking.requester_id === disputerId || booking.provider_id === disputerId;
             if (!isParticipant) {
+                await connection.rollback();
                 return c.json({ success: false, error: 'You are not authorized to dispute this booking.' }, 403);
             }
             if (booking.status !== 'COMPLETED') {
+                await connection.rollback();
                 return c.json({ success: false, error: 'Only completed bookings can be disputed.' }, 409);
             }
-            // 2. Check if a dispute already exists for this booking
-            const [existingDisputes]: any[] = await db.query(
+            const [existingDisputes]: any[] = await connection.execute(
                 'SELECT id FROM disputes WHERE booking_id = ?',
                 [bookingId]
             );
             if (existingDisputes.length > 0) {
+                await connection.rollback();
                 return c.json({ success: false, error: 'A dispute has already been raised for this booking.' }, 409);
             }
-            // 3. Create the dispute and update booking status
-            const [result]: any = await db.query(
+            const [result]: any = await connection.execute(
                 'INSERT INTO disputes (booking_id, reason) VALUES (?, ?)',
                 [bookingId, reason]
             );
+            await connection.execute('UPDATE bookings SET status = \'DISPUTED\' WHERE id = ?', [bookingId]);
+            await connection.commit();
             if (result.insertId) {
-                await db.query('UPDATE bookings SET status = \'DISPUTED\' WHERE id = ?', [bookingId]);
                 return c.json({ success: true, data: { disputeId: result.insertId } }, 201);
             } else {
                 return c.json({ success: false, error: 'Failed to create dispute.' }, 500);
             }
         } catch (error) {
+            if (connection) await connection.rollback();
             console.error('Create dispute error:', error);
             return c.json({ success: false, error: 'Internal Server Error' }, 500);
+        } finally {
+            if (connection) connection.release();
         }
     });
-    // GET /api/disputes - Admin only
     authedApp.get('/api/disputes', authMiddleware, async (c) => {
-        // In a real app, we'd have an admin role check here.
-        // For now, any authenticated user can see this for testing.
         try {
-            const db = getClient(c) as Pool;
-            const [disputes] = await db.query(`
+            const db = getDbPool(c);
+            const [disputes] = await db.execute(`
                 SELECT
                     d.id, d.booking_id, d.reason, d.status, d.created_at,
                     JSON_OBJECT('id', b.id, 'start_time', b.start_time) as booking,
@@ -107,10 +112,10 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
         const { resolution, resolutionNotes, refundAmount } = validation.data;
         let connection: PoolConnection | null = null;
         try {
-            const pool = getClient(c) as Pool;
+            const pool = getDbPool(c);
             connection = await pool.getConnection();
             await connection.beginTransaction();
-            const [disputes]: any[] = await connection.query(
+            const [disputes]: any[] = await connection.execute(
                 `SELECT d.id, d.status, d.booking_id, e.amount as escrow_amount, r.member_id as requester_id, o.provider_id
                  FROM disputes d
                  JOIN bookings b ON d.booking_id = b.id
@@ -129,7 +134,7 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
                 await connection.rollback();
                 return c.json({ success: false, error: 'Dispute is already closed.' }, 409);
             }
-            await connection.query(
+            await connection.execute(
                 'UPDATE disputes SET status = ?, resolved_by_admin_id = ?, resolution_notes = ? WHERE id = ?',
                 [resolution, adminId, resolutionNotes, disputeId]
             );
@@ -138,25 +143,22 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
                     await connection.rollback();
                     return c.json({ success: false, error: 'Refund amount cannot exceed escrowed amount.' }, 400);
                 }
-                await connection.query('UPDATE escrow SET status = \'REFUNDED\' WHERE booking_id = ?', [dispute.booking_id]);
-                await connection.query('UPDATE bookings SET status = \'CANCELLED\' WHERE id = ?', [dispute.booking_id]);
-                // Refund to requester
-                const [reqBalanceResult]: any[] = await connection.query('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.requester_id]);
+                await connection.execute('UPDATE escrow SET status = \'REFUNDED\' WHERE booking_id = ?', [dispute.booking_id]);
+                await connection.execute('UPDATE bookings SET status = \'CANCELLED\' WHERE id = ?', [dispute.booking_id]);
+                const [reqBalanceResult]: any[] = await connection.execute('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.requester_id]);
                 const reqBalance = reqBalanceResult.length > 0 ? parseFloat(reqBalanceResult[0].balance_after) : 0;
-                await connection.query(
+                await connection.execute(
                     'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                     [dispute.requester_id, dispute.booking_id, refundAmount, 'REFUND', reqBalance + refundAmount, `Refund for disputed booking #${dispute.booking_id}`]
                 );
-                // Adjustment for provider
-                const [provBalanceResult]: any[] = await connection.query('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.provider_id]);
+                const [provBalanceResult]: any[] = await connection.execute('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.provider_id]);
                 const provBalance = provBalanceResult.length > 0 ? parseFloat(provBalanceResult[0].balance_after) : 0;
-                await connection.query(
+                await connection.execute(
                     'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                     [dispute.provider_id, dispute.booking_id, -refundAmount, 'ADJUSTMENT', provBalance - refundAmount, `Adjustment for disputed booking #${dispute.booking_id}`]
                 );
             } else {
-                // If rejected or no refund, booking remains completed
-                await connection.query('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [dispute.booking_id]);
+                await connection.execute('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [dispute.booking_id]);
             }
             await connection.commit();
             return c.json({ success: true, data: { disputeId } });

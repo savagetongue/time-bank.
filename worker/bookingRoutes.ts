@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { Env, AuthEnv } from './core-utils';
-import { getClient } from './db';
+import { getDbPool } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-import { Pool, PoolConnection } from "mysql2/promise";
+import { PoolConnection } from "mysql2/promise";
 export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     const bookingSchema = z.object({
@@ -21,10 +21,10 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
         const { requestId, startTime, durationMinutes } = validation.data;
         let connection: PoolConnection | null = null;
         try {
-            const pool = getClient(c) as Pool;
+            const pool = getDbPool(c);
             connection = await pool.getConnection();
             await connection.beginTransaction();
-            const [requests]: any[] = await connection.query(
+            const [requests]: any[] = await connection.execute(
                 `SELECT r.id, r.status, o.provider_id, o.rate_per_hour
                  FROM requests r
                  JOIN offers o ON r.offer_id = o.id
@@ -44,17 +44,17 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                 await connection.rollback();
                 return c.json({ success: false, error: 'This request has already been matched or cancelled.' }, 409);
             }
-            const [bookingResult]: any = await connection.query(
+            const [bookingResult]: any = await connection.execute(
                 'INSERT INTO bookings (request_id, start_time, duration_minutes) VALUES (?, ?, ?)',
                 [requestId, startTime, durationMinutes]
             );
             const bookingId = bookingResult.insertId;
             const escrowHeld = parseFloat(request.rate_per_hour) * (durationMinutes / 60);
-            await connection.query(
+            await connection.execute(
                 'INSERT INTO escrow (booking_id, amount) VALUES (?, ?)',
                 [bookingId, escrowHeld]
             );
-            await connection.query(
+            await connection.execute(
                 'UPDATE requests SET status = \'MATCHED\' WHERE id = ?',
                 [requestId]
             );
@@ -71,7 +71,7 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
     authedApp.get('/api/bookings', authMiddleware, async (c) => {
         const userId = c.get('userId');
         try {
-            const db = getClient(c) as Pool;
+            const db = getDbPool(c);
             const query = `
                 SELECT
                     b.*,
@@ -91,7 +91,7 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                 WHERE o.provider_id = ? OR r.member_id = ?
                 ORDER BY b.start_time DESC
             `;
-            const [rows] = await db.query(query, [userId, userId, userId]);
+            const [rows] = await db.execute(query, [userId, userId, userId]);
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get bookings error:', error);
@@ -106,10 +106,10 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
         }
         let connection: PoolConnection | null = null;
         try {
-            const pool = getClient(c) as Pool;
+            const pool = getDbPool(c);
             connection = await pool.getConnection();
             await connection.beginTransaction();
-            const [bookings]: any[] = await connection.query(
+            const [bookings]: any[] = await connection.execute(
                 `SELECT
                     b.id, b.status,
                     r.member_id as requester_id,
@@ -135,19 +135,19 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                 await connection.rollback();
                 return c.json({ success: false, error: 'Booking is not in a completable state.' }, 409);
             }
-            await connection.query('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [bookingId]);
-            await connection.query('UPDATE escrow SET status = \'RELEASED\' WHERE booking_id = ?', [bookingId]);
-            const [requesterBalanceResult]: any[] = await connection.query('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [booking.requester_id]);
+            await connection.execute('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [bookingId]);
+            await connection.execute('UPDATE escrow SET status = \'RELEASED\' WHERE booking_id = ?', [bookingId]);
+            const [requesterBalanceResult]: any[] = await connection.execute('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [booking.requester_id]);
             const requesterBalance = requesterBalanceResult.length > 0 ? parseFloat(requesterBalanceResult[0].balance_after) : 0;
             const newRequesterBalance = requesterBalance - parseFloat(booking.amount);
-            await connection.query(
+            await connection.execute(
                 'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                 [booking.requester_id, bookingId, -booking.amount, 'DEBIT', newRequesterBalance, `Payment for booking #${bookingId}`]
             );
-            const [providerBalanceResult]: any[] = await connection.query('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [providerId]);
+            const [providerBalanceResult]: any[] = await connection.execute('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [providerId]);
             const providerBalance = providerBalanceResult.length > 0 ? parseFloat(providerBalanceResult[0].balance_after) : 0;
             const newProviderBalance = providerBalance + parseFloat(booking.amount);
-            await connection.query(
+            await connection.execute(
                 'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                 [providerId, bookingId, booking.amount, 'CREDIT', newProviderBalance, `Credit for booking #${bookingId}`]
             );

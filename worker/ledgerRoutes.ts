@@ -1,15 +1,14 @@
 import { Hono } from "hono";
 import { Env, AuthEnv } from './core-utils';
-import { getClient } from './db';
+import { getDbPool } from './db';
 import { authMiddleware } from "./middleware";
-import { Pool } from "mysql2/promise";
 export function ledgerRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     authedApp.get('/api/ledger', authMiddleware, async (c) => {
         const userId = c.get('userId');
         try {
-            const db = getClient(c) as Pool;
-            const [ledgerEntries] = await db.query(
+            const db = getDbPool(c);
+            const [ledgerEntries] = await db.execute(
                 'SELECT id, booking_id, amount, txn_type, balance_after, notes, created_at FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC',
                 [userId]
             );
@@ -22,8 +21,8 @@ export function ledgerRoutes(app: Hono<{ Bindings: Env }>) {
     authedApp.get('/api/balance', authMiddleware, async (c) => {
         const userId = c.get('userId');
         try {
-            const db = getClient(c) as Pool;
-            const [rows]: any[] = await db.query(
+            const db = getDbPool(c);
+            const [rows]: any[] = await db.execute(
                 'SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
                 [userId]
             );

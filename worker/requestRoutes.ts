@@ -1,9 +1,8 @@
 import { Hono } from "hono";
 import { Env, AuthEnv } from './core-utils';
-import { getClient } from './db';
+import { getDbPool } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-import { Pool } from "mysql2/promise";
 export function requestRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     const requestSchema = z.object({
@@ -19,16 +18,15 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { offerId, note } = validation.data;
         try {
-            const db = getClient(c) as Pool;
-            // Check for existing open request from the same member for the same offer
-            const [existing]: any[] = await db.query(
+            const db = getDbPool(c);
+            const [existing]: any[] = await db.execute(
                 'SELECT id FROM requests WHERE offer_id = ? AND member_id = ? AND status = \'OPEN\'',
                 [offerId, memberId]
             );
             if (existing.length > 0) {
                 return c.json({ success: false, error: 'You already have an open request for this offer.' }, 409);
             }
-            const [result]: any = await db.query(
+            const [result]: any = await db.execute(
                 'INSERT INTO requests (offer_id, member_id, note) VALUES (?, ?, ?)',
                 [offerId, memberId, note]
             );
@@ -42,12 +40,11 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
             return c.json({ success: false, error: 'Internal Server Error' }, 500);
         }
     });
-    // Get requests. For providers, it gets incoming requests. For members, it gets outgoing requests.
     authedApp.get('/api/requests', authMiddleware, async (c) => {
         const userId = c.get('userId');
         const { type } = c.req.query(); // 'incoming' or 'outgoing'
         try {
-            const db = getClient(c) as Pool;
+            const db = getDbPool(c);
             let query;
             const params = [userId];
             const baseQuery = `
@@ -64,7 +61,7 @@ export function requestRoutes(app: Hono<{ Bindings: Env }>) {
             } else { // 'outgoing' is the default
                 query = `${baseQuery} WHERE r.member_id = ? ORDER BY r.created_at DESC`;
             }
-            const [rows] = await db.query(query, params);
+            const [rows] = await db.execute(query, params);
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get requests error:', error);

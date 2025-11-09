@@ -1,9 +1,11 @@
-import { createPool, Pool, PoolConnection } from 'mysql2/promise';
+import { createPool, Pool } from 'mysql2/promise';
 import { Context } from 'hono';
+
 let pool: Pool;
-export function getClient(c: Context): Pool {
+
+export function getDbPool(c: Context): Pool {
   if (!pool) {
-    if (!c.env.DB_HOST || !c.env.DB_USER || !c.env.DB_NAME) {
+    if (!c.env.DB_HOST || !c.env.DB_USER || !c.env.DB_NAME || !c.env.DB_PASS) {
       console.error('Database environment variables are not set!');
       throw new Error('Database configuration is missing.');
     }
@@ -20,3 +22,4 @@ export function getClient(c: Context): Pool {
   }
   return pool;
 }
+//
