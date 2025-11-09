@@ -35,7 +35,7 @@ export function adminRoutes(app: Hono<{ Bindings: Env }>) {
             const newBalance = currentBalance + amount;
             // Insert the adjustment entry
             await connection.query(
-                'INSERT INTO ledger (member_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
+                'INSERT INTO ledger (member_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?)',
                 [memberId, amount, 'ADJUSTMENT', newBalance, `Admin adjustment by #${adminId}: ${reason}`]
             );
             await connection.commit();
