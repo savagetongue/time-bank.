@@ -81,7 +81,8 @@ function runSetupCommands() {
     "bun add mysql2@^3.10.0",
     "bun install mysql2",
     "bun remove mysql2",
-    "bun add @planetscale/database"
+    "bun add @planetscale/database",
+    "bun add mysql2"
 ];
     
     if (commands.length === 0) {
