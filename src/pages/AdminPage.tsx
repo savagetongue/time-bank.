@@ -31,7 +31,6 @@ export function AdminPage() {
         throw new Error(disputesRes.error || "Failed to fetch disputes.");
       }
       setDisputes(disputesRes.data);
-
       if (!providersRes.success) {
         throw new Error(providersRes.error || "Failed to fetch top providers.");
       }

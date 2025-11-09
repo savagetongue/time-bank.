@@ -41,7 +41,16 @@ export async function query<T extends RowDataPacket[] | RowDataPacket[][] | OkPa
   params?: any[]
 ): Promise<[T, FieldPacket[]]> {
   const dbPool = getDbPool(c);
-  return dbPool.query<T>(sql, params);
+  let connection: PoolConnection | undefined;
+  try {
+    connection = await dbPool.getConnection();
+    const [rows, fields] = await connection.query<T>(sql, params);
+    return [rows, fields];
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
 }
 /**
  * Executes a series of database operations within a transaction.

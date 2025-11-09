@@ -23,7 +23,6 @@ const offerFormSchema = z.object({
   skills: z.string().min(1, { message: "Please enter at least one skill, comma-separated." }),
   rate_per_hour: z.coerce.number().positive({ message: "Rate must be a positive number." }),
 });
-
 type OfferFormValues = z.infer<typeof offerFormSchema>;
 type CreateOfferFormProps = {
   onSuccess: (newOffer: Offer) => void;

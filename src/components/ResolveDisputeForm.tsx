@@ -54,7 +54,6 @@ export function ResolveDisputeForm({ dispute, onSuccess, setOpen }: ResolveDispu
         refundAmount: values.resolution === 'RESOLVED' ? values.refundAmount : 0,
       };
       const response = await api.post(`/disputes/${dispute.id}/resolve`, payload);
-
       if (response.success) {
         toast.success("Dispute resolved successfully.");
         onSuccess();

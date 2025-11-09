@@ -47,8 +47,7 @@ export function RegisterPage() {
       toast.success("Registration successful! Please log in.");
       navigate("/login");
     } else {
-      const errorMessage = (response.error as { error?: { message?: string } })?.error?.message || "Registration failed. Please try again.";
-      toast.error(errorMessage);
+      toast.error(response.error || "Registration failed. Please try again.");
     }
   }
   return (

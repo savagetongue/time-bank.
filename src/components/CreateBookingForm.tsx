@@ -48,8 +48,7 @@ export function CreateBookingForm({ request, onSuccess, setOpen }: CreateBooking
         startTime: new Date(values.startTime).toISOString(),
         durationMinutes: values.durationMinutes,
       };
-      const response = await api.post<{ bookingId: number }, typeof payload>('/bookings', payload);
-
+      const response = await api.post<{ bookingId: number }>('/bookings', payload);
       if (response.success) {
         toast.success("Booking created successfully!");
         onSuccess();
