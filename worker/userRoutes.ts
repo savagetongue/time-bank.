@@ -35,7 +35,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     app.get('/api/db-test', async (c) => {
         try {
             const db = getClient(c);
-            const [rows] = await db.execute('SELECT 1 + 1 AS solution');
+            const [rows] = await db.query('SELECT 1 + 1 AS solution');
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('DB connection test failed:', error);
@@ -59,7 +59,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const password_hash = await hashPassword(password);
         try {
             const db = getClient(c);
-            const [result]: any = await db.execute(
+            const [result]: any = await db.query(
                 'INSERT INTO members (name, email, password_hash) VALUES (?, ?, ?)',
                 [name, email, password_hash]
             );
@@ -89,7 +89,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         const { email, password } = validation.data;
         try {
             const db = getClient(c);
-            const [rows]: any[] = await db.execute('SELECT id, name, email, password_hash, is_provider, created_at FROM members WHERE email = ?', [email]);
+            const [rows]: any[] = await db.query('SELECT id, name, email, password_hash, is_provider, created_at FROM members WHERE email = ?', [email]);
             if (rows.length === 0) {
                 return c.json({ success: false, error: 'Invalid credentials' }, 401);
             }
@@ -114,10 +114,10 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
         }
     });
     app.get('/api/me', authMiddleware, async (c) => {
-        const userId = c.get('userId');
+        const userId = c.get('userId') as number;
         try {
             const db = getClient(c);
-            const [rows]: any[] = await db.execute('SELECT id, name, email, is_provider, created_at FROM members WHERE id = ?', [userId]);
+            const [rows]: any[] = await db.query('SELECT id, name, email, is_provider, created_at FROM members WHERE id = ?', [userId]);
             if (rows.length === 0) {
                 return c.json({ success: false, error: 'User not found' }, 404);
             }
@@ -140,7 +140,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     app.get('/api/members', async (c) => {
         try {
             const db = getClient(c);
-            const [rows] = await db.execute('SELECT id, name, email, is_provider, created_at FROM members ORDER BY created_at DESC');
+            const [rows] = await db.query('SELECT id, name, email, is_provider, created_at FROM members ORDER BY created_at DESC');
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get members error:', error);
@@ -150,8 +150,61 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     app.get('/api/members/:id', (c) => c.json({ message: `Not Implemented for id: ${c.req.param('id')}` }, 501));
     app.put('/api/members/:id', (c) => c.json({ message: `Not Implemented for id: ${c.req.param('id')}` }, 501));
     // --- Offers ---
-    app.get('/api/offers', (c) => c.json({ message: 'Not Implemented' }, 501));
-    app.post('/api/offers', (c) => c.json({ message: 'Not Implemented' }, 501));
+    app.get('/api/offers', async (c) => {
+        const { limit } = c.req.query();
+        try {
+            const db = getClient(c);
+            let query = `
+                SELECT 
+                    o.id, o.provider_id, o.title, o.description, o.skills, o.rate_per_hour, o.is_active, o.created_at,
+                    JSON_OBJECT('id', m.id, 'name', m.name, 'email', m.email) as provider
+                FROM offers o
+                JOIN members m ON o.provider_id = m.id
+                WHERE o.is_active = TRUE
+                ORDER BY o.created_at DESC
+            `;
+            const params = [];
+            if (limit) {
+                query += ' LIMIT ?';
+                params.push(parseInt(limit, 10));
+            }
+            const [rows] = await db.query(query, params);
+            return c.json({ success: true, data: rows });
+        } catch (error) {
+            console.error('Get offers error:', error);
+            return c.json({ success: false, error: 'Internal Server Error' }, 500);
+        }
+    });
+    const offerSchema = z.object({
+        title: z.string().min(5).max(255),
+        description: z.string().min(10),
+        skills: z.array(z.string()).min(1),
+        rate_per_hour: z.number().positive(),
+    });
+    app.post('/api/offers', authMiddleware, async (c) => {
+        const provider_id = c.get('userId') as number;
+        const body = await c.req.json();
+        const validation = offerSchema.safeParse(body);
+        if (!validation.success) {
+            return c.json({ success: false, error: 'Validation failed', details: validation.error.flatten() }, 400);
+        }
+        const { title, description, skills, rate_per_hour } = validation.data;
+        try {
+            const db = getClient(c);
+            const [result]: any = await db.query(
+                'INSERT INTO offers (provider_id, title, description, skills, rate_per_hour) VALUES (?, ?, ?, ?, ?)',
+                [provider_id, title, description, JSON.stringify(skills), rate_per_hour]
+            );
+            if (result.insertId) {
+                return c.json({ success: true, data: { offerId: result.insertId } });
+            } else {
+                return c.json({ success: false, error: 'Failed to create offer' }, 500);
+            }
+        } catch (error) {
+            console.error('Create offer error:', error);
+            return c.json({ success: false, error: 'Internal Server Error' }, 500);
+        }
+    });
     app.put('/api/offers/:id', (c) => c.json({ message: `Not Implemented for id: ${c.req.param('id')}` }, 501));
     // --- Requests ---
     app.post('/api/requests', (c) => c.json({ message: 'Not Implemented' }, 501));

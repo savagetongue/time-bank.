@@ -24,7 +24,7 @@ export function Header() {
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>
-              <span className="font-bold text-lg">ChronoBank</span>
+              <span className="font-bold text-lg">TimeBank</span>
             </Link>
             <nav className="hidden md:flex items-center gap-4">
               <NavLink to="/offers" className={navLinkClasses}>Offers</NavLink>

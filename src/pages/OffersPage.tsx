@@ -30,7 +30,7 @@ const OfferCard = ({ offer }: { offer: Offer }) => (
     <CardContent className="flex-grow">
       <p className="text-muted-foreground text-sm line-clamp-3">{offer.description}</p>
       <div className="mt-4 flex flex-wrap gap-2">
-        {offer.skills.map(skill => <Badge key={skill} variant="secondary">{skill}</Badge>)}
+        {Array.isArray(offer.skills) && offer.skills.map(skill => <Badge key={skill} variant="secondary">{skill}</Badge>)}
       </div>
     </CardContent>
     <CardFooter className="flex justify-between items-center">
@@ -69,24 +69,15 @@ export function OffersPage() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const fetchOffers = async () => {
-      // Mocking a 501 response for now, will be implemented in a future phase
-      // This structure allows for easy replacement with the real API call
-      // const response = await api.get<Offer[]>('/offers');
-      // MOCK IMPLEMENTATION UNTIL BACKEND IS READY
-      setTimeout(() => {
-        setError("The offers API is not yet implemented. Displaying placeholder content.");
-        setIsLoading(false);
-      }, 1000);
-      // REAL IMPLEMENTATION (when backend is ready)
-      // setIsLoading(true);
-      // setError(null);
-      // const response = await api.get<Offer[]>('/offers');
-      // if (response.success) {
-      //   setOffers(response.data);
-      // } else {
-      //   setError(response.error || "Failed to fetch offers.");
-      // }
-      // setIsLoading(false);
+      setIsLoading(true);
+      setError(null);
+      const response = await api.get<Offer[]>('/offers');
+      if (response.success) {
+        setOffers(response.data);
+      } else {
+        setError(response.error || "Failed to fetch offers.");
+      }
+      setIsLoading(false);
     };
     fetchOffers();
   }, []);
@@ -102,13 +93,13 @@ export function OffersPage() {
           </div>
         </div>
         {error && (
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md my-4">
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md my-4">
             <div className="flex">
               <div className="flex-shrink-0">
-                <AlertCircle className="h-5 w-5 text-yellow-400" aria-hidden="true" />
+                <AlertCircle className="h-5 w-5 text-red-400" aria-hidden="true" />
               </div>
               <div className="ml-3">
-                <p className="text-sm text-yellow-700">{error}</p>
+                <p className="text-sm text-red-700">{error}</p>
               </div>
             </div>
           </div>
