@@ -79,7 +79,9 @@ function updateWranglerJsonc() {
 function runSetupCommands() {
     const commands = [
     "bun add mysql2@^3.10.0",
-    "bun install mysql2"
+    "bun install mysql2",
+    "bun remove mysql2",
+    "bun add @planetscale/database"
 ];
     
     if (commands.length === 0) {
