@@ -1,5 +1,5 @@
 # TimeBank: A Modern Time-Banking Platform
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/savagetongue/time-bank.)
 TimeBank is a sophisticated, minimalist time-banking and skill-sharing platform. It enables users to offer their skills and services in exchange for time credits, rather than traditional currency. The platform features a complete ecosystem including user authentication, service offer creation, a secure booking system with an escrow mechanism, a detailed ledger for tracking transactions, a rating and review system, and an admin-moderated dispute resolution process.
 The entire application is built on a modern, serverless architecture using Cloudflare Workers for the backend API and a responsive React single-page application for the frontend, ensuring a fast, secure, and scalable user experience.
 ## Key Features
@@ -68,6 +68,6 @@ Once your secrets are configured, deploy the application with a single command:
 bun deploy
 ```
 Alternatively, you can deploy directly from your GitHub repository using the button below.
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/savagetongue/time-bank.)
 ## License
 This project is licensed under the MIT License.
