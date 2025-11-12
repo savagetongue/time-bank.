@@ -4,7 +4,7 @@
  */
  {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "chronobank-baoziohznauae02dvlu-f",
+	"name": "communitytimebank",
 	"main": "worker/index.ts",
 	"compatibility_date": "2025-04-24",
 	"assets": {
