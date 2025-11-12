@@ -45,7 +45,7 @@ export function LedgerAdjustmentForm({ onSuccess, setOpen }: LedgerAdjustmentFor
         onSuccess();
         setOpen(false);
       } else {
-        toast.error(response.error || "Failed to adjust ledger.");
+        toast.error(response.error ?? "Failed to adjust ledger.");
       }
     } catch (error) {
       toast.error("An unexpected error occurred.");

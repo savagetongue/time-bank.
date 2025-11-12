@@ -54,7 +54,7 @@ export function CreateBookingForm({ request, onSuccess, setOpen }: CreateBooking
         onSuccess();
         setOpen(false);
       } else {
-        toast.error(response.error || "Failed to create booking. Please try again.");
+        toast.error('error' in response && response.error ? response.error : "Failed to create booking. Please try again.");
       }
     } catch (error) {
       toast.error("An unexpected error occurred. Please try again.");

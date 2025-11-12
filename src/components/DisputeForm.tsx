@@ -42,7 +42,8 @@ export function DisputeForm({ booking, onSuccess, setOpen }: DisputeFormProps) {
     const response = await api.post<{ disputeId: number }>('/disputes', payload);
     setIsLoading(false);
     if (!response.success) {
-      toast.error(response.error || "Failed to raise dispute. Please try again.");
+      const message = 'error' in response && response.error ? response.error : "Failed to raise dispute. Please try again.";
+      toast.error(message);
       return;
     }
     toast.success("Dispute raised successfully.");

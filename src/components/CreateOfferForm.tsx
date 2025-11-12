@@ -52,7 +52,7 @@ export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
       toast.success("Offer created successfully!");
       onSuccess(response.data); // Pass the full new offer object
       setOpen(false);
-    } else {
+    } else if (!response.success) {
       toast.error(response.error || "Failed to create offer. Please try again.");
     }
   }

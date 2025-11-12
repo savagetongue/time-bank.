@@ -47,7 +47,8 @@ export function RatingForm({ booking, onSuccess, setOpen }: RatingFormProps) {
     try {
       const response = await api.post<{ ratingId: number }>('/ratings', payload);
       if (!response.success) {
-        toast.error(response.error || "Failed to submit rating. Please try again.");
+        const errorMessage = 'error' in response && response.error ? response.error : "Failed to submit rating. Please try again.";
+        toast.error(errorMessage);
         return;
       }
       toast.success("Thank you for your feedback!");
