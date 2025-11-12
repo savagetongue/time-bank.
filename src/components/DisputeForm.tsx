@@ -35,20 +35,28 @@ export function DisputeForm({ booking, onSuccess, setOpen }: DisputeFormProps) {
   });
   async function onSubmit(values: DisputeFormValues) {
     setIsLoading(true);
-    const payload = {
-      bookingId: booking.id,
-      reason: values.reason,
-    };
-    const response = await api.post<{ disputeId: number }>('/disputes', payload);
-    setIsLoading(false);
-    if (!response.success) {
-      const message = 'error' in response && response.error ? response.error : "Failed to raise dispute. Please try again.";
+    try {
+      const payload = {
+        bookingId: booking.id,
+        reason: values.reason,
+      };
+      const response = await api.post<{ disputeId: number }>('/disputes', payload);
+
+      if (!response.success) {
+        const message = 'error' in response && response.error ? response.error : "Failed to raise dispute. Please try again.";
+        toast.error(message);
+        return;
+      }
+
+      toast.success("Dispute raised successfully.");
+      onSuccess();
+      setOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
       toast.error(message);
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    toast.success("Dispute raised successfully.");
-    onSuccess();
-    setOpen(false);
   }
   return (
     <Form {...form}>

@@ -57,7 +57,7 @@ export function MyOffersPage() {
     if (response.success) {
       setOffers(response.data);
     } else {
-      setError(response.error || "Failed to fetch your offers.");
+      setError(('error' in response && response.error) || "Failed to fetch your offers.");
     }
     setIsLoading(false);
   };

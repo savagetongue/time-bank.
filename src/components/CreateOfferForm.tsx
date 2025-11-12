@@ -21,7 +21,7 @@ const offerFormSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }).max(255),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
   skills: z.string().min(1, { message: "Please enter at least one skill, comma-separated." }),
-  rate_per_hour: z.coerce.number().positive({ message: "Rate must be a positive number." }),
+  rate_per_hour: z.coerce.number().min(0.01, { message: "Rate must be a positive number." }),
 });
 type OfferFormValues = z.infer<typeof offerFormSchema>;
 type CreateOfferFormProps = {
@@ -53,7 +53,8 @@ export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
       onSuccess(response.data); // Pass the full new offer object
       setOpen(false);
     } else {
-      toast.error(response.error || "Failed to create offer. Please try again.");
+      const errorMessage = response.error || "Failed to create offer. Please try again.";
+      toast.error(errorMessage);
     }
   }
   return (

@@ -21,7 +21,9 @@ const bookingFormSchema = z.object({
   startTime: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "Please select a valid date and time.",
   }),
-  durationMinutes: z.coerce.number().int().min(15, "Duration must be at least 15 minutes."),
+  durationMinutes: z.coerce.number({
+    invalid_type_error: "Duration must be a number.",
+  }).int().min(15, "Duration must be at least 15 minutes."),
 });
 type BookingFormValues = z.infer<typeof bookingFormSchema>;
 type CreateBookingFormProps = {
@@ -54,7 +56,7 @@ export function CreateBookingForm({ request, onSuccess, setOpen }: CreateBooking
         onSuccess();
         setOpen(false);
       } else {
-        toast.error('error' in response && response.error ? response.error : "Failed to create booking. Please try again.");
+        toast.error(response.error || "Failed to create booking. Please try again.");
       }
     } catch (error) {
       toast.error("An unexpected error occurred. Please try again.");
@@ -85,7 +87,13 @@ export function CreateBookingForm({ request, onSuccess, setOpen }: CreateBooking
             <FormItem>
               <FormLabel>Duration (in minutes)</FormLabel>
               <FormControl>
-                <Input type="number" step="15" {...field} disabled={isLoading} />
+                <Input
+                  type="number"
+                  step="15"
+                  {...field}
+                  onChange={event => field.onChange(+event.target.value)}
+                  disabled={isLoading}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

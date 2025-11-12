@@ -3,7 +3,7 @@ import { Env, AuthEnv } from './core-utils';
 import { query, transaction } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-import { RowDataPacket, OkPacket } from "mysql2/promise";
+
 export function adminRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     // In a real app, we would have a stronger admin role check middleware.
@@ -25,16 +25,16 @@ export function adminRoutes(app: Hono<{ Bindings: Env }>) {
             return c.json({ success: false, error: 'Adjustment amount cannot be zero.' }, 400);
         }
         try {
-            const { newBalance } = await transaction(c, async (conn) => {
+            const { newBalance } = await transaction(c, async (tx) => {
                 // Get the latest balance for the member
-                const [balanceResult] = await conn.query<RowDataPacket[]>(
+                const balanceResult = await tx.execute(
                     'SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
                     [memberId]
                 );
-                const currentBalance = balanceResult.length > 0 ? parseFloat(balanceResult[0].balance_after) : 0;
+                const currentBalance = balanceResult.rows.length > 0 ? parseFloat(balanceResult.rows[0].balance_after) : 0;
                 const newBalance = currentBalance + amount;
                 // Insert the adjustment entry
-                await conn.query(
+                await tx.execute(
                     'INSERT INTO ledger (member_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?)',
                     [memberId, amount, 'ADJUSTMENT', newBalance, `Admin adjustment by #${adminId}: ${reason}`]
                 );
@@ -48,7 +48,7 @@ export function adminRoutes(app: Hono<{ Bindings: Env }>) {
     });
     authedApp.get('/api/reports/top-providers', authMiddleware, async (c) => {
         try {
-            const [rows] = await query(c, `
+            const { rows } = await query(c, `
                 SELECT
                     p.id,
                     p.name,

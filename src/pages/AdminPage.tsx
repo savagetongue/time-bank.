@@ -32,6 +32,7 @@ export function AdminPage() {
       } else {
         throw new Error(disputesRes.error || "Failed to fetch disputes.");
       }
+
       if (providersRes.success) {
         setTopProviders(providersRes.data);
       } else {

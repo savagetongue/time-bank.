@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Loader2 } from "lucide-react";
 const ledgerAdjustmentSchema = z.object({
-  memberId: z.coerce.number().int().positive({ message: "Member ID must be a positive integer." }),
+  memberId: z.coerce.number().int().min(1, { message: "Member ID must be a positive integer." }),
   amount: z.coerce.number().refine(val => val !== 0, { message: "Amount cannot be zero." }),
   reason: z.string().min(5, { message: "Reason must be at least 5 characters." }).max(255),
 });
@@ -31,7 +31,7 @@ export function LedgerAdjustmentForm({ onSuccess, setOpen }: LedgerAdjustmentFor
   const form = useForm<LedgerAdjustmentFormValues>({
     resolver: zodResolver(ledgerAdjustmentSchema),
     defaultValues: {
-      memberId: undefined,
+      memberId: 0,
       amount: 0,
       reason: "",
     },
@@ -40,12 +40,16 @@ export function LedgerAdjustmentForm({ onSuccess, setOpen }: LedgerAdjustmentFor
     setIsLoading(true);
     try {
       const response = await api.post('/admin/ledger-adjust', values);
-      if (response.success) {
+      if (response.data.status === 'ok') {
         toast.success("Ledger adjusted successfully.");
         onSuccess();
         setOpen(false);
       } else {
-        toast.error(response.error ?? "Failed to adjust ledger.");
+        const errorMessage =
+          response.data && typeof response.data.error === 'string'
+            ? response.data.error
+            : "Failed to adjust ledger.";
+        toast.error(errorMessage);
       }
     } catch (error) {
       toast.error("An unexpected error occurred.");

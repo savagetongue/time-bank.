@@ -35,10 +35,10 @@ export function LedgerPage() {
         api.get<Balance>('/balance')
       ]);
       if (!ledgerRes.success) {
-        throw new Error(ledgerRes.error || "Failed to fetch ledger.");
+        throw new Error(('error' in ledgerRes && ledgerRes.error) || "Failed to fetch ledger.");
       }
       if (!balanceRes.success) {
-        throw new Error(balanceRes.error || "Failed to fetch balance.");
+        throw new Error(('error' in balanceRes && balanceRes.error) || "Failed to fetch balance.");
       }
       setLedger(ledgerRes.data);
       setBalance(balanceRes.data.balance);

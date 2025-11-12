@@ -1,81 +1,50 @@
-import { createPool, Pool, PoolConnection, FieldPacket, OkPacket, RowDataPacket } from 'mysql2/promise';
+import { Client, Transaction } from '@planetscale/database';
 import { Context } from 'hono';
-// Singleton pool instance
-let pool: Pool;
+
+// Singleton client instance
+let client: Client;
+
 /**
- * Initializes and returns a singleton MySQL connection pool.
+ * Initializes and returns a singleton PlanetScale database client.
  * @param c Hono context to access environment variables.
- * @returns The MySQL connection pool.
+ * @returns The PlanetScale database client.
  */
-function getDbPool(c: Context): Pool {
-  if (!pool) {
+function getClient(c: Context): Client {
+  if (!client) {
     if (!c.env.DB_HOST || !c.env.DB_USER || !c.env.DB_NAME || !c.env.DB_PASS) {
       console.error('Database environment variables are not set!');
       throw new Error('Database configuration is missing.');
     }
-    pool = createPool({
+    client = new Client({
       host: c.env.DB_HOST as string,
-      user: c.env.DB_USER as string,
+      username: c.env.DB_USER as string,
       password: c.env.DB_PASS as string,
       database: c.env.DB_NAME as string,
-      port: c.env.DB_PORT ? parseInt(c.env.DB_PORT as string, 10) : 3306,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      // Add a timeout to prevent long-running queries from hanging
-      connectTimeout: 10000,
     });
   }
-  return pool;
+  return client;
 }
+
 /**
- * Executes a SQL query against the database pool.
+ * Executes a SQL query using the PlanetScale serverless driver.
  * @param c Hono context.
  * @param sql The SQL query string.
  * @param params Optional parameters for the query.
  * @returns A promise that resolves with the query results.
  */
-export async function query<T extends RowDataPacket[] | RowDataPacket[][] | OkPacket | OkPacket[]>(
-  c: Context,
-  sql: string,
-  params?: any[]
-): Promise<[T, FieldPacket[]]> {
-  const dbPool = getDbPool(c);
-  let connection: PoolConnection | undefined;
-  try {
-    connection = await dbPool.getConnection();
-    const [rows, fields] = await connection.query<T>(sql, params);
-    return [rows, fields];
-  } finally {
-    if (connection) {
-      connection.release();
-    }
-  }
+export async function query(c: Context, sql: string, params?: any[]) {
+  const dbClient = getClient(c);
+  return dbClient.execute(sql, params);
 }
+
 /**
- * Executes a series of database operations within a transaction.
- * The connection is automatically managed, and the transaction is committed
- * on success or rolled back on failure.
+ * Executes a series of database operations within a transaction using the PlanetScale serverless driver.
+ * The transaction is automatically committed on success or rolled back on failure.
  * @param c Hono context.
- * @param callback An async function that receives a connection object to perform transactional queries.
+ * @param callback An async function that receives a transaction object to perform transactional queries.
  * @returns A promise that resolves with the result of the callback.
  */
-export async function transaction<T>(
-  c: Context,
-  callback: (conn: PoolConnection) => Promise<T>
-): Promise<T> {
-  const dbPool = getDbPool(c);
-  const connection = await dbPool.getConnection();
-  await connection.beginTransaction();
-  try {
-    const result = await callback(connection);
-    await connection.commit();
-    return result;
-  } catch (error) {
-    await connection.rollback();
-    // Re-throw the error to be handled by the calling route
-    throw error;
-  } finally {
-    connection.release();
-  }
+export async function transaction<T>(c: Context, callback: (tx: Transaction) => Promise<T>): Promise<T> {
+  const dbClient = getClient(c);
+  return dbClient.transaction(callback);
 }

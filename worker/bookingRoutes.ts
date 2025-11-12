@@ -3,7 +3,7 @@ import { Env, AuthEnv } from './core-utils';
 import { query, transaction } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-import { RowDataPacket, OkPacket } from "mysql2/promise";
+
 export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     const bookingSchema = z.object({
@@ -20,8 +20,8 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { requestId, startTime, durationMinutes } = validation.data;
         try {
-            const result = await transaction(c, async (conn) => {
-                const [requests] = await conn.query<RowDataPacket[]>(
+            const result = await transaction(c, async (tx) => {
+                const { rows: requests } = await tx.execute(
                     `SELECT r.id, r.status, o.provider_id, o.rate_per_hour
                      FROM requests r
                      JOIN offers o ON r.offer_id = o.id
@@ -31,24 +31,24 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                 if (requests.length === 0) {
                     throw { error: 'Request not found.', status: 404 };
                 }
-                const request = requests[0];
+                const request = requests[0] as any;
                 if (request.provider_id !== providerId) {
                     throw { error: 'You are not authorized to book this request.', status: 403 };
                 }
                 if (request.status !== 'OPEN') {
                     throw { error: 'This request has already been matched or cancelled.', status: 409 };
                 }
-                const [bookingResult] = await conn.query<OkPacket>(
+                const bookingResult = await tx.execute(
                     'INSERT INTO bookings (request_id, start_time, duration_minutes) VALUES (?, ?, ?)',
                     [requestId, startTime, durationMinutes]
                 );
                 const bookingId = bookingResult.insertId;
                 const escrowHeld = parseFloat(request.rate_per_hour) * (durationMinutes / 60);
-                await conn.query(
+                await tx.execute(
                     'INSERT INTO escrow (booking_id, amount) VALUES (?, ?)',
                     [bookingId, escrowHeld]
                 );
-                await conn.query(
+                await tx.execute(
                     'UPDATE requests SET status = \'MATCHED\' WHERE id = ?',
                     [requestId]
                 );
@@ -85,7 +85,7 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                 WHERE o.provider_id = ? OR r.member_id = ?
                 ORDER BY b.start_time DESC
             `;
-            const [rows] = await query(c, sql, [userId, userId, userId]);
+            const { rows } = await query(c, sql, [userId, userId, userId]);
             return c.json({ success: true, data: rows });
         } catch (error) {
             console.error('Get bookings error:', error);
@@ -99,8 +99,8 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
             return c.json({ success: false, error: 'Invalid booking ID.' }, 400);
         }
         try {
-            const result = await transaction(c, async (conn) => {
-                const [bookings] = await conn.query<RowDataPacket[]>(
+            const result = await transaction(c, async (tx) => {
+                const { rows: bookings } = await tx.execute(
                     `SELECT
                         b.id, b.status,
                         r.member_id as requester_id,
@@ -116,26 +116,26 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                 if (bookings.length === 0) {
                     throw { error: 'Booking not found.', status: 404 };
                 }
-                const booking = bookings[0];
+                const booking = bookings[0] as any;
                 if (booking.provider_id !== providerId) {
                     throw { error: 'You are not authorized to complete this booking.', status: 403 };
                 }
                 if (booking.status !== 'PENDING') {
                     throw { error: 'Booking is not in a completable state.', status: 409 };
                 }
-                await conn.query('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [bookingId]);
-                await conn.query('UPDATE escrow SET status = \'RELEASED\' WHERE booking_id = ?', [bookingId]);
-                const [requesterBalanceResult] = await conn.query<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [booking.requester_id]);
-                const requesterBalance = requesterBalanceResult.length > 0 ? parseFloat(requesterBalanceResult[0].balance_after) : 0;
+                await tx.execute('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [bookingId]);
+                await tx.execute('UPDATE escrow SET status = \'RELEASED\' WHERE booking_id = ?', [bookingId]);
+                const { rows: requesterBalanceResult } = await tx.execute('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [booking.requester_id]);
+                const requesterBalance = requesterBalanceResult.length > 0 ? parseFloat((requesterBalanceResult[0] as any).balance_after) : 0;
                 const newRequesterBalance = requesterBalance - parseFloat(booking.amount);
-                await conn.query(
+                await tx.execute(
                     'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                     [booking.requester_id, bookingId, -booking.amount, 'DEBIT', newRequesterBalance, `Payment for booking #${bookingId}`]
                 );
-                const [providerBalanceResult] = await conn.query<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [providerId]);
-                const providerBalance = providerBalanceResult.length > 0 ? parseFloat(providerBalanceResult[0].balance_after) : 0;
+                const { rows: providerBalanceResult } = await tx.execute('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [providerId]);
+                const providerBalance = providerBalanceResult.length > 0 ? parseFloat((providerBalanceResult[0] as any).balance_after) : 0;
                 const newProviderBalance = providerBalance + parseFloat(booking.amount);
-                await conn.query(
+                await tx.execute(
                     'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                     [providerId, bookingId, booking.amount, 'CREDIT', newProviderBalance, `Credit for booking #${bookingId}`]
                 );

@@ -3,7 +3,7 @@ import { Env, AuthEnv } from './core-utils';
 import { query } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-import { RowDataPacket, OkPacket } from "mysql2/promise";
+
 export function ratingsRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     const ratingSchema = z.object({
@@ -20,7 +20,7 @@ export function ratingsRoutes(app: Hono<{ Bindings: Env }>) {
         }
         const { bookingId, score, comments } = validation.data;
         try {
-            const [bookings] = await query<RowDataPacket[]>(c,
+            const { rows: bookings } = await query(c,
                 `SELECT b.status, r.member_id as requester_id, o.provider_id
                  FROM bookings b
                  JOIN requests r ON b.request_id = r.id
@@ -40,7 +40,7 @@ export function ratingsRoutes(app: Hono<{ Bindings: Env }>) {
             if (booking.status !== 'COMPLETED') {
                 return c.json({ success: false, error: 'You can only rate completed bookings.' }, 409);
             }
-            const [existingRatings] = await query<RowDataPacket[]>(c,
+            const { rows: existingRatings } = await query(c,
                 'SELECT id FROM ratings WHERE booking_id = ? AND rater_id = ?',
                 [bookingId, raterId]
             );
@@ -48,7 +48,7 @@ export function ratingsRoutes(app: Hono<{ Bindings: Env }>) {
                 return c.json({ success: false, error: 'You have already rated this booking.' }, 409);
             }
             const rateeId = isRequester ? booking.provider_id : booking.requester_id;
-            const [result] = await query<OkPacket>(c,
+            const result = await query(c,
                 'INSERT INTO ratings (booking_id, rater_id, ratee_id, score, comments) VALUES (?, ?, ?, ?, ?)',
                 [bookingId, raterId, rateeId, score, comments]
             );

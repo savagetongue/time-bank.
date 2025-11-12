@@ -27,7 +27,7 @@ import { DisputeWithDetails } from "@shared/types";
 const resolveDisputeSchema = z.object({
   resolution: z.enum(['RESOLVED', 'REJECTED']),
   resolutionNotes: z.string().optional(),
-  refundAmount: z.coerce.number().min(0).optional(),
+  refundAmount: z.coerce.number().min(0).optional().default(0),
 });
 type ResolveDisputeFormValues = z.infer<typeof resolveDisputeSchema>;
 type ResolveDisputeFormProps = {
@@ -59,7 +59,7 @@ export function ResolveDisputeForm({ dispute, onSuccess, setOpen }: ResolveDispu
         onSuccess();
         setOpen(false);
       } else {
-        toast.error(response.error ?? "Failed to resolve dispute.");
+        toast.error(typeof response.error === 'string' ? response.error : "Failed to resolve dispute.");
       }
     } catch (error) {
       toast.error("An unexpected error occurred.");
