@@ -41,16 +41,13 @@ export function DisputeForm({ booking, onSuccess, setOpen }: DisputeFormProps) {
         reason: values.reason,
       };
       const response = await api.post<{ disputeId: number }>('/disputes', payload);
-
-      if (!response.success) {
-        const message = 'error' in response && response.error ? response.error : "Failed to raise dispute. Please try again.";
-        toast.error(message);
-        return;
+      if (response.success) {
+        toast.success("Dispute raised successfully.");
+        onSuccess();
+        setOpen(false);
+      } else {
+        toast.error(response.error || "Failed to raise dispute. Please try again.");
       }
-
-      toast.success("Dispute raised successfully.");
-      onSuccess();
-      setOpen(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "An unexpected error occurred. Please try again.";
       toast.error(message);

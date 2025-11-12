@@ -3,7 +3,6 @@ import { Env, AuthEnv } from './core-utils';
 import { query, transaction } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-
 export function adminRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     // In a real app, we would have a stronger admin role check middleware.
@@ -31,7 +30,7 @@ export function adminRoutes(app: Hono<{ Bindings: Env }>) {
                     'SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
                     [memberId]
                 );
-                const currentBalance = balanceResult.rows.length > 0 ? parseFloat(balanceResult.rows[0].balance_after) : 0;
+                const currentBalance = balanceResult.rows.length > 0 ? parseFloat((balanceResult.rows[0] as any).balance_after) : 0;
                 const newBalance = currentBalance + amount;
                 // Insert the adjustment entry
                 await tx.execute(

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, ShieldCheck, Star, Trophy, Settings, PlusCircle } from "lucide-react";
+import { AlertCircle, ShieldCheck, Star, Trophy, PlusCircle } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { ResolveDisputeForm } from "@/components/ResolveDisputeForm";
@@ -32,7 +32,6 @@ export function AdminPage() {
       } else {
         throw new Error(disputesRes.error || "Failed to fetch disputes.");
       }
-
       if (providersRes.success) {
         setTopProviders(providersRes.data);
       } else {

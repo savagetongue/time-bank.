@@ -39,27 +39,22 @@ export function RatingForm({ booking, onSuccess, setOpen }: RatingFormProps) {
   });
   const currentRating = form.watch("score");
   async function onSubmit(values: RatingFormValues) {
+    setIsLoading(true);
     const payload = {
       bookingId: booking.id,
       ...values,
     };
     try {
-      setIsLoading(true);
       const response = await api.post<{ ratingId: number }>('/ratings', payload);
-      if (!response.success) {
-        const errorMessage = 'error' in response && response.error ? response.error : "Failed to submit rating. Please try again.";
-        toast.error(errorMessage);
-        return;
-      }
-      toast.success("Thank you for your feedback!");
-      onSuccess();
-      setOpen(false);
-    } catch (error) {
-      if (error instanceof Error && error.message) {
-        toast.error(error.message);
+      if (response.success) {
+        toast.success("Thank you for your feedback!");
+        onSuccess();
+        setOpen(false);
       } else {
-        toast.error("An unexpected error occurred. Please try again.");
+        toast.error(response.error || "Failed to submit rating. Please try again.");
       }
+    } catch (error) {
+      toast.error("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }

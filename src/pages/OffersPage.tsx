@@ -99,7 +99,7 @@ export function OffersPage() {
       if (response.success) {
         setOffers(response.data);
       } else {
-        setError(response.error ?? "Failed to fetch offers.");
+        setError(response.error || "Failed to fetch offers.");
       }
       setIsLoading(false);
     };

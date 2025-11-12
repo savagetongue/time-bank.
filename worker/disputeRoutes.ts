@@ -3,7 +3,6 @@ import { Env, AuthEnv } from './core-utils';
 import { query, transaction } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-
 export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     const disputeSchema = z.object({
@@ -31,7 +30,7 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
                 if (bookings.length === 0) {
                     throw { error: 'Booking not found.', status: 404 };
                 }
-                const booking = bookings[0];
+                const booking = bookings[0] as any;
                 const isParticipant = booking.requester_id === disputerId || booking.provider_id === disputerId;
                 if (!isParticipant) {
                     throw { error: 'You are not authorized to dispute this booking.', status: 403 };
@@ -118,7 +117,7 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
                 if (disputes.length === 0) {
                     throw { error: 'Dispute not found.', status: 404 };
                 }
-                const dispute = disputes[0];
+                const dispute = disputes[0] as any;
                 if (dispute.status !== 'OPEN') {
                     throw { error: 'Dispute is already closed.', status: 409 };
                 }
@@ -133,13 +132,13 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
                     await conn.execute('UPDATE escrow SET status = \'REFUNDED\' WHERE booking_id = ?', [dispute.booking_id]);
                     await conn.execute('UPDATE bookings SET status = \'CANCELLED\' WHERE id = ?', [dispute.booking_id]);
                     const { rows: reqBalanceResult } = await conn.execute('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.requester_id]);
-                    const reqBalance = reqBalanceResult.length > 0 ? parseFloat(reqBalanceResult[0].balance_after) : 0;
+                    const reqBalance = reqBalanceResult.length > 0 ? parseFloat((reqBalanceResult[0] as any).balance_after) : 0;
                     await conn.execute(
                         'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                         [dispute.requester_id, dispute.booking_id, refundAmount, 'REFUND', reqBalance + refundAmount, `Refund for disputed booking #${dispute.booking_id}`]
                     );
                     const { rows: provBalanceResult } = await conn.execute('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.provider_id]);
-                    const provBalance = provBalanceResult.length > 0 ? parseFloat(provBalanceResult[0].balance_after) : 0;
+                    const provBalance = provBalanceResult.length > 0 ? parseFloat((provBalanceResult[0] as any).balance_after) : 0;
                     await conn.execute(
                         'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                         [dispute.provider_id, dispute.booking_id, -refundAmount, 'ADJUSTMENT', provBalance - refundAmount, `Adjustment for disputed booking #${dispute.booking_id}`]

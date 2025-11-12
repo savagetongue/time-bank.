@@ -63,14 +63,13 @@ const RequestList = ({ type, onAccept, refetchTrigger }: { type: 'incoming' | 'o
     if (response.success) {
       setRequests(response.data);
     } else {
-      const errorMessage = 'error' in response && response.error ? response.error : `Failed to fetch ${type} requests.`;
-      setError(errorMessage);
+      setError(response.error || `Failed to fetch ${type} requests.`);
     }
     setIsLoading(false);
   }, [type]);
   useEffect(() => {
     fetchRequests();
-  }, [type, fetchRequests, refetchTrigger]);
+  }, [fetchRequests, refetchTrigger]);
   if (isLoading) {
     return (
       <div className="space-y-4">

@@ -34,14 +34,16 @@ export function LedgerPage() {
         api.get<LedgerEntry[]>('/ledger'),
         api.get<Balance>('/balance')
       ]);
-      if (!ledgerRes.success) {
-        throw new Error(('error' in ledgerRes && ledgerRes.error) || "Failed to fetch ledger.");
+      if (ledgerRes.success) {
+        setLedger(ledgerRes.data);
+      } else {
+        throw new Error(ledgerRes.error || "Failed to fetch ledger.");
       }
-      if (!balanceRes.success) {
-        throw new Error(('error' in balanceRes && balanceRes.error) || "Failed to fetch balance.");
+      if (balanceRes.success) {
+        setBalance(balanceRes.data.balance);
+      } else {
+        throw new Error(balanceRes.error || "Failed to fetch balance.");
       }
-      setLedger(ledgerRes.data);
-      setBalance(balanceRes.data.balance);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -119,7 +121,7 @@ export function LedgerPage() {
                 </div>
               </TableCell>
               <TableCell className="text-right">
-                <Badge variant={entry.amount > 0 ? "default" : "destructive"} className="font-mono">
+                <Badge variant={entry.amount >= 0 ? "default" : "destructive"} className="font-mono">
                   {entry.amount > 0 ? '+' : ''}{entry.amount.toFixed(2)}
                 </Badge>
               </TableCell>

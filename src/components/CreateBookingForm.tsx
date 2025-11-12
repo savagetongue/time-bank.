@@ -91,7 +91,6 @@ export function CreateBookingForm({ request, onSuccess, setOpen }: CreateBooking
                   type="number"
                   step="15"
                   {...field}
-                  onChange={event => field.onChange(+event.target.value)}
                   disabled={isLoading}
                 />
               </FormControl>

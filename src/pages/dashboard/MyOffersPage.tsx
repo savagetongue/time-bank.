@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import { Offer } from "@shared/types";
 import { Button } from "@/components/ui/button";
@@ -50,22 +50,23 @@ export function MyOffersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const fetchMyOffers = async () => {
+  const fetchMyOffers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     const response = await api.get<Offer[]>('/me/offers');
     if (response.success) {
       setOffers(response.data);
     } else {
-      setError(('error' in response && response.error) || "Failed to fetch your offers.");
+      setError(response.error || "Failed to fetch your offers.");
     }
     setIsLoading(false);
-  };
+  }, []);
   useEffect(() => {
     fetchMyOffers();
-  }, []);
-  const handleSuccess = () => {
-    fetchMyOffers(); // Refetch offers after a new one is created
+  }, [fetchMyOffers]);
+  const handleSuccess = (newOffer: Offer) => {
+    setOffers(prevOffers => [newOffer, ...prevOffers]);
+    fetchMyOffers(); // Or optimistically update state
   };
   return (
     <Card>

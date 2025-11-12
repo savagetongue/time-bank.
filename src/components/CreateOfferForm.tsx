@@ -36,7 +36,7 @@ export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
       title: "",
       description: "",
       skills: "",
-      rate_per_hour: 0,
+      rate_per_hour: 1,
     },
   });
   async function onSubmit(values: OfferFormValues) {
@@ -50,11 +50,10 @@ export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
     setIsLoading(false);
     if (response.success) {
       toast.success("Offer created successfully!");
-      onSuccess(response.data); // Pass the full new offer object
+      onSuccess(response.data);
       setOpen(false);
     } else {
-      const errorMessage = response.error || "Failed to create offer. Please try again.";
-      toast.error(errorMessage);
+      toast.error(response.error || "Failed to create offer. Please try again.");
     }
   }
   return (
@@ -106,7 +105,7 @@ export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
             <FormItem>
               <FormLabel>Rate (credits per hour)</FormLabel>
               <FormControl>
-                <Input type="number" {...field} disabled={isLoading} />
+                <Input type="number" step="0.01" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>

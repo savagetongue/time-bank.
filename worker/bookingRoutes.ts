@@ -3,7 +3,6 @@ import { Env, AuthEnv } from './core-utils';
 import { query, transaction } from './db';
 import { z } from 'zod';
 import { authMiddleware } from "./middleware";
-
 export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
     const authedApp = app as unknown as Hono<AuthEnv>;
     const bookingSchema = z.object({

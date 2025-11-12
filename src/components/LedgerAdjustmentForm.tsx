@@ -31,7 +31,7 @@ export function LedgerAdjustmentForm({ onSuccess, setOpen }: LedgerAdjustmentFor
   const form = useForm<LedgerAdjustmentFormValues>({
     resolver: zodResolver(ledgerAdjustmentSchema),
     defaultValues: {
-      memberId: 0,
+      memberId: undefined,
       amount: 0,
       reason: "",
     },
@@ -40,16 +40,12 @@ export function LedgerAdjustmentForm({ onSuccess, setOpen }: LedgerAdjustmentFor
     setIsLoading(true);
     try {
       const response = await api.post('/admin/ledger-adjust', values);
-      if (response.data.status === 'ok') {
+      if (response.success) {
         toast.success("Ledger adjusted successfully.");
         onSuccess();
         setOpen(false);
       } else {
-        const errorMessage =
-          response.data && typeof response.data.error === 'string'
-            ? response.data.error
-            : "Failed to adjust ledger.";
-        toast.error(errorMessage);
+        toast.error(response.error || "Failed to adjust ledger.");
       }
     } catch (error) {
       toast.error("An unexpected error occurred.");
@@ -68,7 +64,7 @@ export function LedgerAdjustmentForm({ onSuccess, setOpen }: LedgerAdjustmentFor
             <FormItem>
               <FormLabel>Member ID</FormLabel>
               <FormControl>
-                <Input type="number" placeholder="e.g., 123" {...field} disabled={isLoading} />
+                <Input type="number" placeholder="e.g., 123" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : +e.target.value)} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>

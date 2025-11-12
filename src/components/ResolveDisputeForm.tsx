@@ -59,7 +59,7 @@ export function ResolveDisputeForm({ dispute, onSuccess, setOpen }: ResolveDispu
         onSuccess();
         setOpen(false);
       } else {
-        toast.error(typeof response.error === 'string' ? response.error : "Failed to resolve dispute.");
+        toast.error(response.error || "Failed to resolve dispute.");
       }
     } catch (error) {
       toast.error("An unexpected error occurred.");
