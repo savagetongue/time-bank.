@@ -27,14 +27,14 @@ export function adminRoutes(app: Hono<{ Bindings: Env }>) {
         try {
             const { newBalance } = await transaction(c, async (conn) => {
                 // Get the latest balance for the member
-                const [balanceResult] = await conn.execute<RowDataPacket[]>(
+                const [balanceResult] = await conn.query<RowDataPacket[]>(
                     'SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
                     [memberId]
                 );
                 const currentBalance = balanceResult.length > 0 ? parseFloat(balanceResult[0].balance_after) : 0;
                 const newBalance = currentBalance + amount;
                 // Insert the adjustment entry
-                await conn.execute(
+                await conn.query(
                     'INSERT INTO ledger (member_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?)',
                     [memberId, amount, 'ADJUSTMENT', newBalance, `Admin adjustment by #${adminId}: ${reason}`]
                 );

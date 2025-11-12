@@ -20,7 +20,7 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
         const { bookingId, reason } = validation.data;
         try {
             const result = await transaction(c, async (conn) => {
-                const [bookings] = await conn.execute<RowDataPacket[]>(
+                const [bookings] = await conn.query<RowDataPacket[]>(
                     `SELECT b.status, r.member_id as requester_id, o.provider_id
                      FROM bookings b
                      JOIN requests r ON b.request_id = r.id
@@ -39,18 +39,18 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
                 if (booking.status !== 'COMPLETED') {
                     throw { error: 'Only completed bookings can be disputed.', status: 409 };
                 }
-                const [existingDisputes] = await conn.execute<RowDataPacket[]>(
+                const [existingDisputes] = await conn.query<RowDataPacket[]>(
                     'SELECT id FROM disputes WHERE booking_id = ?',
                     [bookingId]
                 );
                 if (existingDisputes.length > 0) {
                     throw { error: 'A dispute has already been raised for this booking.', status: 409 };
                 }
-                const [insertResult] = await conn.execute<OkPacket>(
+                const [insertResult] = await conn.query<OkPacket>(
                     'INSERT INTO disputes (booking_id, reason) VALUES (?, ?)',
                     [bookingId, reason]
                 );
-                await conn.execute('UPDATE bookings SET status = \'DISPUTED\' WHERE id = ?', [bookingId]);
+                await conn.query('UPDATE bookings SET status = \'DISPUTED\' WHERE id = ?', [bookingId]);
                 if (insertResult.insertId) {
                     return { disputeId: insertResult.insertId };
                 } else {
@@ -105,7 +105,7 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
         const { resolution, resolutionNotes, refundAmount } = validation.data;
         try {
             const result = await transaction(c, async (conn) => {
-                const [disputes] = await conn.execute<RowDataPacket[]>(
+                const [disputes] = await conn.query<RowDataPacket[]>(
                     `SELECT d.id, d.status, d.booking_id, e.amount as escrow_amount, r.member_id as requester_id, o.provider_id
                      FROM disputes d
                      JOIN bookings b ON d.booking_id = b.id
@@ -122,7 +122,7 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
                 if (dispute.status !== 'OPEN') {
                     throw { error: 'Dispute is already closed.', status: 409 };
                 }
-                await conn.execute(
+                await conn.query(
                     'UPDATE disputes SET status = ?, resolved_by_admin_id = ?, resolution_notes = ? WHERE id = ?',
                     [resolution, adminId, resolutionNotes, disputeId]
                 );
@@ -130,22 +130,22 @@ export function disputeRoutes(app: Hono<{ Bindings: Env }>) {
                     if (refundAmount > dispute.escrow_amount) {
                         throw { error: 'Refund amount cannot exceed escrowed amount.', status: 400 };
                     }
-                    await conn.execute('UPDATE escrow SET status = \'REFUNDED\' WHERE booking_id = ?', [dispute.booking_id]);
-                    await conn.execute('UPDATE bookings SET status = \'CANCELLED\' WHERE id = ?', [dispute.booking_id]);
-                    const [reqBalanceResult] = await conn.execute<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.requester_id]);
+                    await conn.query('UPDATE escrow SET status = \'REFUNDED\' WHERE booking_id = ?', [dispute.booking_id]);
+                    await conn.query('UPDATE bookings SET status = \'CANCELLED\' WHERE id = ?', [dispute.booking_id]);
+                    const [reqBalanceResult] = await conn.query<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.requester_id]);
                     const reqBalance = reqBalanceResult.length > 0 ? parseFloat(reqBalanceResult[0].balance_after) : 0;
-                    await conn.execute(
+                    await conn.query(
                         'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                         [dispute.requester_id, dispute.booking_id, refundAmount, 'REFUND', reqBalance + refundAmount, `Refund for disputed booking #${dispute.booking_id}`]
                     );
-                    const [provBalanceResult] = await conn.execute<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.provider_id]);
+                    const [provBalanceResult] = await conn.query<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [dispute.provider_id]);
                     const provBalance = provBalanceResult.length > 0 ? parseFloat(provBalanceResult[0].balance_after) : 0;
-                    await conn.execute(
+                    await conn.query(
                         'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                         [dispute.provider_id, dispute.booking_id, -refundAmount, 'ADJUSTMENT', provBalance - refundAmount, `Adjustment for disputed booking #${dispute.booking_id}`]
                     );
                 } else {
-                    await conn.execute('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [dispute.booking_id]);
+                    await conn.query('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [dispute.booking_id]);
                 }
                 return { disputeId };
             });

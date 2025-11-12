@@ -21,7 +21,7 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
         const { requestId, startTime, durationMinutes } = validation.data;
         try {
             const result = await transaction(c, async (conn) => {
-                const [requests] = await conn.execute<RowDataPacket[]>(
+                const [requests] = await conn.query<RowDataPacket[]>(
                     `SELECT r.id, r.status, o.provider_id, o.rate_per_hour
                      FROM requests r
                      JOIN offers o ON r.offer_id = o.id
@@ -38,17 +38,17 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                 if (request.status !== 'OPEN') {
                     throw { error: 'This request has already been matched or cancelled.', status: 409 };
                 }
-                const [bookingResult] = await conn.execute<OkPacket>(
+                const [bookingResult] = await conn.query<OkPacket>(
                     'INSERT INTO bookings (request_id, start_time, duration_minutes) VALUES (?, ?, ?)',
                     [requestId, startTime, durationMinutes]
                 );
                 const bookingId = bookingResult.insertId;
                 const escrowHeld = parseFloat(request.rate_per_hour) * (durationMinutes / 60);
-                await conn.execute(
+                await conn.query(
                     'INSERT INTO escrow (booking_id, amount) VALUES (?, ?)',
                     [bookingId, escrowHeld]
                 );
-                await conn.execute(
+                await conn.query(
                     'UPDATE requests SET status = \'MATCHED\' WHERE id = ?',
                     [requestId]
                 );
@@ -100,7 +100,7 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
         }
         try {
             const result = await transaction(c, async (conn) => {
-                const [bookings] = await conn.execute<RowDataPacket[]>(
+                const [bookings] = await conn.query<RowDataPacket[]>(
                     `SELECT
                         b.id, b.status,
                         r.member_id as requester_id,
@@ -123,19 +123,19 @@ export function bookingRoutes(app: Hono<{ Bindings: Env }>) {
                 if (booking.status !== 'PENDING') {
                     throw { error: 'Booking is not in a completable state.', status: 409 };
                 }
-                await conn.execute('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [bookingId]);
-                await conn.execute('UPDATE escrow SET status = \'RELEASED\' WHERE booking_id = ?', [bookingId]);
-                const [requesterBalanceResult] = await conn.execute<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [booking.requester_id]);
+                await conn.query('UPDATE bookings SET status = \'COMPLETED\' WHERE id = ?', [bookingId]);
+                await conn.query('UPDATE escrow SET status = \'RELEASED\' WHERE booking_id = ?', [bookingId]);
+                const [requesterBalanceResult] = await conn.query<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [booking.requester_id]);
                 const requesterBalance = requesterBalanceResult.length > 0 ? parseFloat(requesterBalanceResult[0].balance_after) : 0;
                 const newRequesterBalance = requesterBalance - parseFloat(booking.amount);
-                await conn.execute(
+                await conn.query(
                     'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                     [booking.requester_id, bookingId, -booking.amount, 'DEBIT', newRequesterBalance, `Payment for booking #${bookingId}`]
                 );
-                const [providerBalanceResult] = await conn.execute<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [providerId]);
+                const [providerBalanceResult] = await conn.query<RowDataPacket[]>('SELECT balance_after FROM ledger WHERE member_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [providerId]);
                 const providerBalance = providerBalanceResult.length > 0 ? parseFloat(providerBalanceResult[0].balance_after) : 0;
                 const newProviderBalance = providerBalance + parseFloat(booking.amount);
-                await conn.execute(
+                await conn.query(
                     'INSERT INTO ledger (member_id, booking_id, amount, txn_type, balance_after, notes) VALUES (?, ?, ?, ?, ?, ?)',
                     [providerId, bookingId, booking.amount, 'CREDIT', newProviderBalance, `Credit for booking #${bookingId}`]
                 );

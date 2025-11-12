@@ -48,11 +48,11 @@ export function CreateOfferForm({ onSuccess, setOpen }: CreateOfferFormProps) {
     };
     const response = await api.post<Offer>('/offers', payload);
     setIsLoading(false);
-    if (response.success && response.data) {
+    if (response.success) {
       toast.success("Offer created successfully!");
       onSuccess(response.data); // Pass the full new offer object
       setOpen(false);
-    } else if (!response.success) {
+    } else {
       toast.error(response.error || "Failed to create offer. Please try again.");
     }
   }
